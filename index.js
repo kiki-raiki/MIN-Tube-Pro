@@ -45,6 +45,7 @@ function fetchWithTimeout(url, options = {}, timeout = 5000) {
   ]);
 }
 
+// ミドルウェア: 人間確認
 app.use(async (req, res, next) => {
   if (req.path.startsWith("/api") || req.path.startsWith("/video") || req.path === "/") {
     if (!req.cookies || req.cookies.humanVerified !== "true") {
@@ -82,67 +83,74 @@ app.get("/api/search", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ★★★ 全ジャンル対応：ユニバーサル・レコメンド・アルゴリズム ★★★
+// ★★★ 究極のパーフェクト・アルゴリズム (No Shorts, No Channels) ★★★
 app.get("/api/recommendations", async (req, res) => {
   const { title, channel, id } = req.query;
   try {
-    // 1. タイトルのクリーニング（ノイズ除去）
-    // 【】, (), [], 記号、日付、4K/HDなどの画質表記を消して核心単語を抽出
-    const coreTitle = title
+    // 1. タイトルのクレンジング（検索精度向上）
+    const cleanKwd = title
       .replace(/[【】「」()!！?？\[\]]/g, ' ')
-      .replace(/\d{4}年|\d{1,2}月\d{1,2}日/g, '')
-      .replace(/ver\.\d+|4K|HD|1080p|60fps/gi, '')
+      .replace(/#shorts|shorts|ショート/gi, '') // 検索ワードからShortsを排除
       .replace(/\s+/g, ' ')
       .trim();
 
-    // 単語に分解して、意味のありそうな長い単語を抽出
-    const words = coreTitle.split(' ').filter(w => w.length >= 2);
-    const mainTopic = words.length > 0 ? words.slice(0, 3).join(' ') : coreTitle;
+    const words = cleanKwd.split(' ').filter(w => w.length >= 2);
+    const mainTopic = words.length > 0 ? words.slice(0, 2).join(' ') : cleanKwd;
 
-    // 2. 複数の意図で並列検索（ジャンルを問わず関連性を高める）
-    const searchTasks = [
-      yts.GetListByKeyword(`${mainTopic}`, false, 10),              // A: 同じ題材
-      yts.GetListByKeyword(`${channel}`, false, 6),                // B: 同じ投稿者の別動画
-      yts.GetListByKeyword(`${mainTopic} 関連`, false, 6)           // C: 関連する別トピック
+    // 2. 複数のソースから候補を収集
+    const [topicRes, channelRes, relatedRes] = await Promise.all([
+      yts.GetListByKeyword(`${mainTopic}`, false, 12),
+      yts.GetListByKeyword(`${channel}`, false, 8),
+      yts.GetListByKeyword(`${mainTopic} 関連`, false, 8)
+    ]);
+
+    let rawList = [
+      ...(topicRes.items || []),
+      ...(channelRes.items || []),
+      ...(relatedRes.items || [])
     ];
 
-    const searchResults = await Promise.all(searchTasks);
-    
-    // 3. データの結合と高度なフィルタリング
-    let combinedItems = [];
-    searchResults.forEach(res => {
-      if (res && res.items) combinedItems = [...combinedItems, ...res.items];
-    });
-
-    const seenIds = new Set([id]);
+    // 3. 厳格なフィルタリング・フェーズ
+    const seenIds = new Set([id]); 
     const seenNormalizedTitles = new Set();
-    const finalRecommendations = [];
+    const finalItems = [];
 
-    for (const item of combinedItems) {
-      if (!item.id || seenIds.has(item.id)) continue;
+    for (const item of rawList) {
+      // (1) アカウント（Channel）やプレイリストを除外、動画のみを許可
+      if (!item.id || item.type !== 'video') continue;
+      
+      // (2) すでにリストにある、または現在の動画ならスキップ
+      if (seenIds.has(item.id)) continue;
 
-      // タイトルの正規化（重複判定用）
-      // 歌詞、公式、やり方などの差分を無視して「同じネタ」を排除
+      // (3) Shortsの徹底排除ロジック
+      const isShortsTitle = /#shorts|shorts|ショート/gi.test(item.title);
+      // 一部のAPIではthumbnailのURLにshortsが含まれる、または特定のフラグがある
+      const isShortsThumb = item.thumbnail?.thumbnails?.[0]?.url?.includes('shorts');
+      if (isShortsTitle || isShortsThumb) continue;
+
+      // (4) タイトルの正規化による「重複内容」の排除
       const normalized = item.title.toLowerCase()
         .replace(/\s+/g, '')
-        .replace(/official|lyrics|mv|musicvideo|video|解説|実況|検証|方法|紹介/g, '');
+        .replace(/official|lyrics|mv|musicvideo|video|公式|実況|解説|ショート|#shorts/g, '');
 
-      // 似すぎているタイトルはスキップして多様性を出す
-      if (seenNormalizedTitles.has(normalized.substring(0, 15))) continue;
+      // 内容が似すぎている動画（例：同じ曲の別アップロードなど）を排除
+      const titleSig = normalized.substring(0, 12);
+      if (seenNormalizedTitles.has(titleSig)) continue;
 
+      // 合格した動画をリストに追加
       seenIds.add(item.id);
-      seenNormalizedTitles.add(normalized.substring(0, 15));
-      finalRecommendations.push(item);
+      seenNormalizedTitles.add(titleSig);
+      finalItems.push(item);
 
-      if (finalRecommendations.length >= 20) break;
+      if (finalItems.length >= 18) break; 
     }
 
-    // 4. YouTubeらしい「適度なバラつき」を作るためのシャッフル
-    const result = finalRecommendations.sort(() => 0.5 - Math.random());
+    // 4. シャッフルして自然なおすすめ感を演出
+    const result = finalItems.sort(() => 0.5 - Math.random());
     
     res.json({ items: result });
   } catch (err) {
-    console.error("Recommendation Engine Error:", err);
+    console.error("Rec Engine Error:", err);
     res.json({ items: [] });
   }
 });
@@ -218,12 +226,13 @@ app.get("/video/:id", async (req, res, next) => {
             background: var(--bg-main);
             display: flex; align-items: center; justify-content: space-between;
             padding: 0 16px; box-sizing: border-box; z-index: 1000;
+            border-bottom: 1px solid #222;
         }
-        .nav-left { display: flex; align-items: center; gap: 16px; font-size: 20px; }
-        .logo { display: flex; align-items: center; color: white; text-decoration: none; font-weight: bold; }
+        .nav-left { display: flex; align-items: center; gap: 16px; }
+        .logo { display: flex; align-items: center; color: white; text-decoration: none; font-weight: bold; font-size: 18px; }
         .logo i { color: var(--yt-red); font-size: 24px; margin-right: 4px; }
         
-        .nav-center { flex: 0 1 720px; display: flex; align-items: center; }
+        .nav-center { flex: 0 1 600px; display: flex; }
         .search-bar {
             display: flex; width: 100%;
             background: #121212; border: 1px solid #303030; border-radius: 40px 0 0 40px;
@@ -231,7 +240,7 @@ app.get("/video/:id", async (req, res, next) => {
         }
         .search-bar input {
             width: 100%; background: transparent; border: none; color: white;
-            height: 40px; font-size: 16px; outline: none;
+            height: 38px; font-size: 16px; outline: none;
         }
         .search-btn {
             background: #222; border: 1px solid #303030; border-left: none;
@@ -240,10 +249,10 @@ app.get("/video/:id", async (req, res, next) => {
         }
 
         .container {
-            margin-top: 72px; display: flex; justify-content: center;
-            padding: 0 24px; gap: 24px; max-width: 1700px; margin-left: auto; margin-right: auto;
+            margin-top: 56px; display: flex; justify-content: center;
+            padding: 24px; gap: 24px; max-width: 1700px; margin-left: auto; margin-right: auto;
         }
-        .main-content { flex: 1; max-width: 1280px; min-width: 0; }
+        .main-content { flex: 1; min-width: 0; }
         .sidebar { width: 400px; flex-shrink: 0; }
 
         .player-container {
@@ -252,38 +261,43 @@ app.get("/video/:id", async (req, res, next) => {
         }
         .player-container video, .player-container iframe { width: 100%; height: 100%; border: none; }
 
-        .video-title { font-size: 20px; font-weight: bold; margin: 12px 0 8px 0; line-height: 28px; }
-        .owner-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .video-title { font-size: 20px; font-weight: bold; margin: 12px 0; line-height: 28px; }
+        .owner-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
         .owner-info { display: flex; align-items: center; gap: 12px; }
-        .owner-info img { width: 40px; height: 40px; border-radius: 50%; background: #333; }
+        .owner-info img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
         .channel-name { font-weight: bold; font-size: 16px; }
+        
         .btn-sub {
             background: white; color: black; border: none;
             padding: 0 16px; height: 36px; border-radius: 18px;
-            font-weight: bold; cursor: pointer; margin-left: 12px;
+            font-weight: bold; cursor: pointer;
+        }
+        .action-btn {
+            background: var(--bg-secondary); border: none; color: white;
+            padding: 0 16px; height: 36px; border-radius: 18px;
+            cursor: pointer; font-size: 14px;
         }
 
         .description-box {
             background: var(--bg-secondary); border-radius: 12px;
-            padding: 12px; font-size: 14px; line-height: 20px;
-            margin-bottom: 24px;
+            padding: 12px; font-size: 14px; margin-bottom: 24px;
         }
 
-        .comment-item { display: flex; gap: 16px; margin-bottom: 24px; }
+        .comment-item { display: flex; gap: 16px; margin-bottom: 20px; }
         .comment-avatar { width: 40px; height: 40px; border-radius: 50%; }
         .comment-author { font-weight: bold; font-size: 13px; margin-bottom: 4px; display: block; }
 
         .rec-item { display: flex; gap: 8px; margin-bottom: 12px; cursor: pointer; text-decoration: none; color: inherit; }
-        .rec-thumb { width: 168px; height: 94px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #222; }
+        .rec-thumb { width: 160px; height: 90px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #222; }
         .rec-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .rec-title { font-size: 14px; font-weight: bold; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .rec-meta { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 
-        @media (max-width: 1100px) {
+        @media (max-width: 1000px) {
             .container { flex-direction: column; padding: 0; }
-            .sidebar { width: 100%; padding: 12px; box-sizing: border-box; }
-            .main-content { padding: 12px; }
+            .sidebar { width: 100%; padding: 16px; box-sizing: border-box; }
             .player-container { border-radius: 0; }
+            .main-content { padding: 16px; }
         }
     </style>
 </head>
@@ -299,7 +313,7 @@ app.get("/video/:id", async (req, res, next) => {
             <button type="submit" class="search-btn"><i class="fas fa-search"></i></button>
         </form>
     </div>
-    <div class="nav-right" style="width: 40px;"></div>
+    <div style="width:100px;"></div>
 </nav>
 
 <div class="container">
@@ -311,13 +325,12 @@ app.get("/video/:id", async (req, res, next) => {
         <div class="owner-row">
             <div class="owner-info">
                 <img src="${videoData.channelImage || 'https://via.placeholder.com/40'}">
-                <div>
-                    <div class="channel-name">${videoData.channelName}</div>
-                </div>
+                <div class="channel-name">${videoData.channelName}</div>
                 <button class="btn-sub">チャンネル登録</button>
             </div>
             <div style="display:flex; gap:8px;">
-                <button class="btn-sub" style="background:var(--bg-secondary); color:white;">👍 ${videoData.likeCount || 0}</button>
+                <button class="action-btn">👍 ${videoData.likeCount || 0}</button>
+                <button class="action-btn">共有</button>
             </div>
         </div>
         <div class="description-box">
@@ -326,17 +339,15 @@ app.get("/video/:id", async (req, res, next) => {
         </div>
         <div class="comments-section">
             <h3>コメント ${commentsData.commentCount} 件</h3>
-            <div id="commentsList">
-                ${commentsData.comments.map(c => `
-                    <div class="comment-item">
-                        <img class="comment-avatar" src="${c.authorThumbnails?.[0]?.url || ''}">
-                        <div>
-                            <span class="comment-author">${c.author}</span>
-                            <div style="font-size:14px;">${c.content}</div>
-                        </div>
+            ${commentsData.comments.map(c => `
+                <div class="comment-item">
+                    <img class="comment-avatar" src="${c.authorThumbnails?.[0]?.url || ''}">
+                    <div>
+                        <span class="comment-author">${c.author}</span>
+                        <div style="font-size:14px;">${c.content}</div>
                     </div>
-                `).join('')}
-            </div>
+                </div>
+            `).join('')}
         </div>
     </div>
     <div class="sidebar">
@@ -354,8 +365,7 @@ app.get("/video/:id", async (req, res, next) => {
         const res = await fetch(\`/api/recommendations?\${params.toString()}\`);
         const data = await res.json();
         
-        const recContainer = document.getElementById('recommendations');
-        recContainer.innerHTML = data.items.map(item => \`
+        document.getElementById('recommendations').innerHTML = data.items.map(item => \`
             <a href="/video/\${item.id}" class="rec-item">
                 <div class="rec-thumb"><img src="https://i.ytimg.com/vi/\${item.id}/mqdefault.jpg"></div>
                 <div class="rec-info">
