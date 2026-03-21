@@ -292,432 +292,297 @@ app.get("/video/:id", async (req, res, next) => {
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${videoData.videoTitle || "動画詳細"}</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin:0;
-      padding:0;
-      background-color: #121212;
-      color: #e0e0e0;
-    }
-    header {
-      padding: 20px;
-      text-align: center;
-      background-color: #1e1e1e;
-    }
-    header h1 {
-      margin: 0;
-      font-size: 24px;
-    }
-    .container {
-      padding: 20px;
-    }
-    .main-content {
-      display: flex;
-      gap: 20px;
-      align-items: flex-start;
-    }
-    .video-section {
-      flex: 1;
-    }
-    .video-player {
-      width: 100%;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    video, iframe {
-      width:  100%;
-      height: auto;
-      background-color: black;
-    }
-    
-    #controls {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      overflow-x: auto;
-      padding: 10px 0;
-    }
-    #controls button {
-      flex: 0 0 auto;
-      padding: 8px 12px;
-      font-size: 14px;
-      cursor: pointer;
-      background-color: #333;
-      border: none;
-      color: #e0e0e0;
-      border-radius: 4px;
-    }
-    #controls button:hover {
-      background-color: #555;
-    }
-    #controls button.active {
-      background-color: #bb86fc;
-      color: #121212;
-    }
-    .details {
-      max-width: 800px;
-      margin: 20px auto;
-    }
-    .channel-info {
-      display: flex;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    .channel-avatar {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      object-fit: cover;
-      margin-right: 10px;
-    }
-    .comments {
-      max-width: 800px;
-      margin: 20px auto;
-    }
-    .comment {
-      border-bottom: 1px solid #333;
-      padding: 10px 0;
-    }
-    .comment-header {
-      display: flex;
-      align-items: center;
-    }
-    .avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      object-fit: cover;
-      margin-right: 10px;
-    }
-    .comment-author {
-      font-weight: bold;
-    }
-    .comment-time {
-      margin-left: auto;
-      font-size: 12px;
-      color: #aaa;
-    }
-    .comment-body {
-      margin: 5px 0;
-    }
-    .comment-stats {
-      font-size: 12px;
-      color: #aaa;
-    }
-    a {
-      color: #bb86fc;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-    .back-link {
-      margin-top: 20px;
-      display: block;
-      text-align: center;
-    }
-    
-    .playlist-section {
-      width: 300px;
-      background-color: #1e1e1e;
-      padding: 10px;
-      border-radius: 4px;
-      max-height: 600px;
-      overflow-y: auto;
-    }
-    .playlist-section h2 {
-      font-size: 18px;
-      margin-bottom: 10px;
-    }
-    .playlist-item {
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background-color: #121212;
-      padding: 5px;
-      border-radius: 4px;
-    }
-    .playlist-item img {
-      width: 90px;
-      height: auto;
-      display: block;
-      border-radius: 8px;
-    }
-    .playlist-item-title {
-      font-size: 14px;
-      font-weight: bold;
-      color: #e0e0e0;
-    }
-    
-    .search-header {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      background-color: #1b1b1b; 
-      padding: 10px 20px;
-      display: flex;
-      justify-content: space-between; 
-      align-items: center;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-    }
-    
-    .logo a {
-      color: #a64ac9; 
-      font-size: 24px;
-      font-weight: bold;
-      text-decoration: none;
-      transition: color 0.3s ease;
-    }
-    
-    .logo a:hover {
-      color: #d891ef; 
-    }
-    
-    #search-form {
-      display: flex;
-      max-width: 600px;
-      width: 100%;
-    }
-    
-    #search-input {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-radius: 2px 0 0 2px;
-      background-color: #333333; 
-      color: #ffffff;
-      font-size: 16px;
-      outline: none;
-    }
-    
-    #search-form button {
-      padding: 10px 20px;
-      border: none;
-      background-color: #6200ea; 
-      color: #ffffff;
-      font-size: 16px;
-      border-radius: 0 2px 2px 0;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-    }
-    
-    #search-form button:hover {
-      background-color: #4500b5; /* ホバー時の濃い紫 */
-    }
-    
-    .loading-animation {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 300px;
-    }
-    .spinner {
-      border: 8px solid rgba(255, 255, 255, 0.2);
-      border-top: 8px solid #bb86fc;
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    /* 高画質化アニメーション */
-    .high-quality-animation {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 300px;
-      color: #e0e0e0;
-      font-size: 18px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${videoData.videoTitle || "Youtube-Pro"}</title>
+
+<style>
+
+/* ===== 全体 ===== */
+body{
+  margin:0;
+  font-family: Roboto, Arial, sans-serif;
+  background:#0f0f0f;
+  color:#fff;
+}
+
+/* ===== ヘッダー ===== */
+.header{
+  position:fixed;
+  top:0;
+  width:100%;
+  display:flex;
+  align-items:center;
+  padding:10px 20px;
+  background:#0f0f0f;
+  border-bottom:1px solid #222;
+  z-index:999;
+}
+
+.logo{
+  color:#ff0000;
+  font-weight:bold;
+  font-size:20px;
+  margin-right:20px;
+}
+
+#search-form{
+  flex:1;
+  display:flex;
+  max-width:600px;
+}
+
+#search-input{
+  flex:1;
+  padding:10px;
+  background:#121212;
+  border:1px solid #333;
+  color:#fff;
+}
+
+#search-form button{
+  background:#ff0000;
+  border:none;
+  color:white;
+  padding:10px 15px;
+  cursor:pointer;
+}
+
+/* ===== レイアウト ===== */
+.container{
+  margin-top:70px;
+  display:flex;
+  padding:20px;
+  gap:20px;
+}
+
+.main{
+  flex:3;
+}
+
+.sidebar{
+  flex:1.5;
+}
+
+/* ===== 動画 ===== */
+.video-player iframe,
+.video-player video{
+  width:100%;
+  height:520px;
+  background:black;
+}
+
+/* ===== タイトル ===== */
+.title{
+  font-size:18px;
+  margin:10px 0;
+}
+
+/* ===== チャンネル ===== */
+.channel-box{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin:10px 0;
+}
+
+.channel-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.channel-left img{
+  width:40px;
+  border-radius:50%;
+}
+
+.subscribe{
+  background:#cc0000;
+  border:none;
+  color:white;
+  padding:10px 16px;
+  cursor:pointer;
+}
+
+/* ===== アクション ===== */
+.actions{
+  display:flex;
+  gap:10px;
+  margin:10px 0;
+}
+
+.action-btn{
+  background:#272727;
+  border:none;
+  padding:8px 12px;
+  color:white;
+  cursor:pointer;
+}
+
+.action-btn:hover{
+  background:#444;
+}
+
+/* ===== 説明 ===== */
+.description{
+  background:#1f1f1f;
+  padding:10px;
+  border-radius:8px;
+}
+
+/* ===== コメント ===== */
+.comments{
+  margin-top:20px;
+}
+
+.comment{
+  display:flex;
+  gap:10px;
+  margin-bottom:15px;
+}
+
+.comment img{
+  width:36px;
+  border-radius:50%;
+}
+
+.comment-body{
+  flex:1;
+}
+
+.comment-author{
+  font-weight:bold;
+  font-size:13px;
+}
+
+.comment-text{
+  font-size:14px;
+}
+
+/* ===== サイド動画 ===== */
+.side-item{
+  display:flex;
+  gap:10px;
+  margin-bottom:12px;
+  cursor:pointer;
+}
+
+.side-item img{
+  width:160px;
+}
+
+.side-title{
+  font-size:14px;
+}
+
+.side-channel{
+  font-size:12px;
+  color:#aaa;
+}
+
+</style>
 </head>
+
 <body>
-  <header class="search-header">
-    <div class="logo">
-      <a href="/">MIN-Tube2</a>
-    </div>
-    <form id="search-form">
-      <input type="text" id="search-input" name="q" placeholder="検索..." autocomplete="off" />
-      <button type="submit">検索</button>
-    </form>
-  </header>
-  </header>
-  <header>
-    <h1>status:OK</h1>
-  </header>
-  <div class="container">
-    <div class="main-content">
-      <div class="video-section">
-        <div class="video-player" id="video-player-container">
-          <div class="loading-animation"><div class="spinner"></div></div>
-        </div>
-        <div id="controls">
-          <button id="switch-stream-url" class="active">DL‑Yvideo</button>
-          <button id="switch-nocookie">YouTube‑nocookie</button>
-          <button id="reload-video">動画を再読み込み</button>
-          <button id="refetch-video">動画を再取得</button>
-          <button id="download-video">ダウンロード</button>
-          <!-- 高画質化ボタン -->
-          <button id="high-quality-btn">高画質化</button>
-        </div>
-        <header>
-          <h1>${videoData.videoTitle || "動画詳細"}</h1>
-        </header>
-        <div class="details">
-          <h2>動画詳細</h2>
-          <div class="channel-info">
-           <a href="/channel/${videoData.channelId || ''}">
-            <img class="channel-avatar" src="${videoData.channelImage || ''}" alt="${videoData.channelName || 'チャンネル'}" />
-           </a>
-          <div>
-           <a href="/channel/${videoData.channelId || ''}">
-            <p>${videoData.channelName || 'チャンネル名未設定'}</p>
-             </a>
-         </div>
-        </div>
-          <p>${videoData.videoDes || "詳細情報はありません"}</p>
-          <p>視聴回数: ${videoData.videoViews ? videoData.videoViews.toLocaleString() : "0"}</p>
-          <p>いいね: ${videoData.likeCount ? videoData.likeCount.toLocaleString() : "0"}</p>
-          <p><a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">YouTubeで視聴する</a></p>
-        </div>
-        <div class="comments">
-          <h2>コメント (${commentsData.commentCount || 0} 件)</h2>
-          ${commentsHTML}
-        </div>
-        <a class="back-link" href="/">home</a>
-      </div>
-      <div class="playlist-section">
-        <h2>${videoData.channelName || "プレイリスト"}</h2>
-        <div id="playlist-container">
-          <p>読み込み中...</p>
-        </div>
+
+<div class="header">
+  <div class="logo">Youtube-Pro</div>
+
+  <form id="search-form">
+    <input id="search-input" placeholder="検索">
+    <button>検索</button>
+  </form>
+</div>
+
+<div class="container">
+
+<div class="main">
+
+  <div class="video-player" id="player"></div>
+
+  <div class="title">${videoData.videoTitle || ""}</div>
+
+  <!-- チャンネル -->
+  <div class="channel-box">
+    <div class="channel-left">
+      <img src="${videoData.channelImage || ""}">
+      <div>
+        <div>${videoData.channelName || ""}</div>
+        <div style="font-size:12px;color:#aaa;">登録者数非表示</div>
       </div>
     </div>
+
+    <button class="subscribe">登録</button>
   </div>
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const channelName = "${videoData.channelName || ''}";
-      if (channelName) {
-        fetch('/api/playlist?channelName=' + encodeURIComponent(channelName))
-          .then(response => response.json())
-          .then(data => {
-            let html = "";
-            if (data.playlist && data.playlist.length > 0) {
-              data.playlist.forEach(item => {
-                // チャンネル情報（IDがUCで始まる）は除外する
-                if (item.id.startsWith("UC")) return;
-                html += \`
-                  <div class="playlist-item">
-                    <a href="/video/\${item.id}">
-                      <img src="https://i3.ytimg.com/vi/\${item.id}/sddefault.jpg" alt="\${item.title}">
-                      <div class="playlist-item-title">\${item.title}</div>
-                    </a>
-                  </div>
-                \`;
-              });
-            } else {
-              html = "<p>プレイリストがありません。</p>";
-            }
-            document.getElementById("playlist-container").innerHTML = html;
-          })
-          .catch(err => {
-            console.error(err);
-            document.getElementById("playlist-container").innerHTML = "<p>プレイリストの読み込みに失敗しました。</p>";
-          });
-      } else {
-        document.getElementById("playlist-container").innerHTML = "<p>チャネル情報がありません。</p>";
-      }
-      
-      const streamEmbedHTML = \`${streamEmbedHTML.replace(/`/g, '\\`')}\`;
-      const youtubeEmbedHTML = \`${youtubeEmbedHTML.replace(/`/g, '\\`')}\`;
-      
-      setTimeout(() => {
-        const container = document.getElementById("video-player-container");
-        if (container) {
-          container.innerHTML = streamEmbedHTML;
-        }
-      }, 1000);
-      
-      const btnStream = document.getElementById("switch-stream-url");
-      const btnNocookie = document.getElementById("switch-nocookie");
-      const btnReload = document.getElementById("reload-video");
-      const btnRefetch = document.getElementById("refetch-video");
-      const btnDownload = document.getElementById("download-video");
-      const highQualityBtn = document.getElementById("high-quality-btn");
-      
-      btnStream.addEventListener("click", () => {
-        document.getElementById("video-player-container").innerHTML = streamEmbedHTML;
-        btnStream.classList.add("active");
-        btnNocookie.classList.remove("active");
-      });
-      btnNocookie.addEventListener("click", () => {
-        document.getElementById("video-player-container").innerHTML = youtubeEmbedHTML;
-        btnNocookie.classList.add("active");
-        btnStream.classList.remove("active");
-      });
-      btnReload.addEventListener("click", () => {
-        const videoElem = document.querySelector('.video-player video');
-        if (videoElem) {
-          videoElem.load();
-          videoElem.play();
-        } else {
-          const iframeElem = document.querySelector('.video-player iframe');
-          if (iframeElem) {
-            iframeElem.src = iframeElem.src;
-          }
-        }
-      });
-      btnRefetch.addEventListener("click", () => {
-        window.location.reload();
-      });
-      btnDownload.addEventListener("click", () => {
-        const dlLink = ( "${videoData.stream_url}" !== "youtube-nocookie" )
-            ? "${videoData.stream_url}"
-            : "https://www.youtube.com/watch?v=${videoId}";
-        window.open(dlLink, '_blank');
-      });
-      
-      
-      highQualityBtn.addEventListener("click", () => {
-        const container = document.getElementById("video-player-container");
-        if (container) {
-          container.innerHTML = \`
-            <div class="high-quality-animation">
-              <div class="spinner"></div>
-              <p>高画質化中...</p>
-            </div>
-          \`;
-          setTimeout(() => {
-            container.innerHTML = \`
-              <iframe src="/highstream/${videoId}" frameborder="0" allowfullscreen style="width:100%; height:60vh;"></iframe>
-            \`;
-          }, 3000);
-        }
-      });
-    });
-    document.addEventListener("DOMContentLoaded", function() {
-      const form = document.getElementById("search-form");
-      form.addEventListener("submit", function(event) {
-        event.preventDefault(); 
-        const query = document.getElementById("search-input").value.trim();
-        if (query) {
-          window.location.href = "/nothing/search?q=" + encodeURIComponent(query);
-        }
-      });
-    });
-  </script>
+
+  <!-- アクション -->
+  <div class="actions">
+    <button class="action-btn">👍 ${videoData.likeCount || 0}</button>
+    <button class="action-btn">共有</button>
+    <button class="action-btn">保存</button>
+  </div>
+
+  <!-- 説明 -->
+  <div class="description">
+    <p>${videoData.videoViews || 0} 回視聴</p>
+    <p>${videoData.videoDes || ""}</p>
+  </div>
+
+  <!-- コメント -->
+  <div class="comments">
+    <h3>コメント ${commentsData.commentCount || 0}</h3>
+    ${commentsHTML}
+  </div>
+
+</div>
+
+<!-- サイド -->
+<div class="sidebar" id="sidebar"></div>
+
+</div>
+
+<script>
+
+const streamHTML = \`${streamEmbedHTML.replace(/`/g,"\\`")}\`;
+const youtubeHTML = \`${youtubeEmbedHTML.replace(/`/g,"\\`")}\`;
+
+/* 初期再生 */
+document.getElementById("player").innerHTML = streamHTML;
+
+/* 検索 */
+document.getElementById("search-form").onsubmit = e=>{
+  e.preventDefault();
+  const q = document.getElementById("search-input").value;
+  location.href = "/nothing/search?q=" + encodeURIComponent(q);
+};
+
+/* サイド動画 */
+fetch('/api/playlist?channelName=${videoData.channelName}')
+.then(r=>r.json())
+.then(d=>{
+  let html="";
+  d.playlist.forEach(v=>{
+    html+=\`
+      <div class="side-item" onclick="location.href='/video/\${v.id}'">
+        <img src="https://i3.ytimg.com/vi/\${v.id}/mqdefault.jpg">
+        <div>
+          <div class="side-title">\${v.title}</div>
+          <div class="side-channel">${videoData.channelName}</div>
+        </div>
+      </div>
+    \`;
+  });
+  document.getElementById("sidebar").innerHTML = html;
+});
+
+/* プレイヤー切替（ダブルクリックで） */
+document.getElementById("player").ondblclick = ()=>{
+  document.getElementById("player").innerHTML = youtubeHTML;
+};
+
+</script>
+
 </body>
 </html>
     `;
