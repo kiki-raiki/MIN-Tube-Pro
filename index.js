@@ -76,48 +76,71 @@ app.get("/", (req, res) => {
 app.get("/api/trending", async (req, res) => {
   const page = parseInt(req.query.page) || 0;
   try {
-    // 1. 本物のトレンドを抽出するためのシードキーワード群
-    // 単なる「急上昇」という言葉ではなく、YouTubeで常にトラフィックが高い「動詞」や「属性」を組み合わせる
-    const trendingSeeds = [
-      "人気急上昇", "最新 ニュース", "Music Video Official", 
-      "ゲーム実況 人気", "話題の動画", "トレンド", 
-      "Breaking News Japan", "Top Hits", "いま話題"
+    // 1. タイトルに「人気」と入っていなくても、圧倒的な再生数を誇るベースジャンル
+    const baseTopics = [
+      "Official Music Video", "ライブ 配信 ニュース", 
+      "ゲーム 実況", "THE FIRST TAKE", "Vlog", 
+      "歌ってみた", "切り抜き", "ハイライト", 
+      "料理 レシピ", "エンタメ", "アニメ 最新話"
     ];
 
-    // ページ数に応じてシードを切り替え、常に新鮮なデータを確保
-    const seed1 = trendingSeeds[(page * 2) % trendingSeeds.length];
-    const seed2 = trendingSeeds[(page * 2 + 1) % trendingSeeds.length];
+    // ページごとにジャンルをズラして取得（常に新鮮なプールを作成）
+    const seed1 = baseTopics[(page * 2) % baseTopics.length];
+    const seed2 = baseTopics[(page * 2 + 1) % baseTopics.length];
 
-    // 2. 複数の角度から検索を並列実行
+    // 2. 複数のジャンルから幅広く動画を取得
     const [res1, res2] = await Promise.all([
-      yts.GetListByKeyword(seed1, false, 25),
-      yts.GetListByKeyword(seed2, false, 25)
+      yts.GetListByKeyword(seed1, false, 30),
+      yts.GetListByKeyword(seed2, false, 30)
     ]);
 
     let combined = [...(res1.items || []), ...(res2.items || [])];
-    const finalItems = [];
-    const seenIdsServer = new Set();
+    const uniqueItemsMap = new Map();
 
     for (const item of combined) {
-      // 厳格なフィルタリング
-      // (1) 動画のみ (2) Shorts除外 (3) 重複除外 (4) チャンネルやプレイリストを除外
-      if (item.type === 'video' && 
-          !item.title.toLowerCase().includes('#shorts') && 
-          !item.title.toLowerCase().includes('shorts') &&
-          !seenIdsServer.has(item.id)) {
-        
-        // 人気動画らしい「指標（視聴回数テキスト）」があるかチェック（任意）
-        // 視聴回数が入っていないものは「急上昇」とは言えないため
-        if (item.viewCountText) {
-          seenIdsServer.add(item.id);
-          finalItems.push(item);
-        }
+      // 基本フィルタリング（動画のみ、Shorts除外）
+      if (item.type !== 'video') continue;
+      if (item.title.toLowerCase().includes('#shorts') || item.title.toLowerCase().includes('shorts')) continue;
+      if (!item.viewCountText) continue;
+
+      // 3. 再生回数パーサー (文字列から純粋な数値を抽出)
+      // 例: "123万 回視聴" -> 1230000, "1.5M views" -> 1500000, "1,234 views" -> 1234
+      const text = item.viewCountText.replace(/,/g, '');
+      let views = 0;
+      const match = text.match(/[\d.]+/);
+      
+      if (match) {
+        let num = parseFloat(match[0]);
+        if (text.includes('億') || text.includes('B')) num *= 100000000;
+        else if (text.includes('万')) num *= 10000;
+        else if (text.includes('M')) num *= 1000000;
+        else if (text.includes('K')) num *= 1000;
+        views = num;
+      }
+
+      // 4. ガチの人気動画フィルター (最低5万回以上再生されているものだけを許可)
+      if (views < 50000) continue;
+
+      // ソート用に数値をプロパティとして保持
+      item.numericViews = views;
+
+      // 重複排除
+      if (!uniqueItemsMap.has(item.id)) {
+        uniqueItemsMap.set(item.id, item);
       }
     }
 
-    // 3. 多様性を出すための加重シャッフル
-    const result = finalItems.sort(() => 0.5 - Math.random());
-    res.json({ items: result });
+    // 5. 再生回数（人気度）が圧倒的に高い順に並び替え
+    let finalItems = Array.from(uniqueItemsMap.values());
+    finalItems.sort((a, b) => b.numericViews - a.numericViews);
+
+    // 上位20件を厳選
+    finalItems = finalItems.slice(0, 20);
+
+    // いつも同じ並びにならないよう、上位陣の中で少しだけシャッフル
+    finalItems.sort(() => 0.5 - Math.random());
+
+    res.json({ items: finalItems });
     
   } catch (err) {
     console.error("Trending API Error:", err);
