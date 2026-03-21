@@ -99,6 +99,27 @@
     let currentPage = 0;
     let currentQuery = 'trending';
 
+    // Utility: Fisher-Yates shuffle
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    async function fetchEndpoint(endpoint) {
+      try {
+        const res = await fetch(endpoint);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.items || [];
+      } catch (err) {
+        console.error("Fetch error", err);
+        return [];
+      }
+    }
+
     async function loadContent(query = 'trending', page = 0) {
       if (isFetching) return;
       isFetching = true;
@@ -115,15 +136,57 @@
         : `/api/search?q=${encodeURIComponent(query)}&page=${page}`;
 
       try {
-        const res = await fetch(endpoint);
-        const data = await res.json();
-        const items = data.items || [];
+        // Primary fetch
+        let items = await fetchEndpoint(endpoint);
+
+        // If first page and too few items, supplement with other categories and shuffle
+        if (page === 0) {
+          const MIN_ITEMS = 12; // 期待する最低表示数
+          if (items.length < MIN_ITEMS) {
+            // Collect other categories from chips
+            const chips = Array.from(document.querySelectorAll('.chip'))
+              .map(c => c.dataset.q)
+              .filter(q => q && q !== query);
+
+            // Shuffle categories to get varied content
+            shuffleArray(chips);
+
+            // Try fetching from up to 4 other categories (or fewer if not available)
+            const supplementPromises = [];
+            const maxSupplementSources = Math.min(4, chips.length);
+            for (let i = 0; i < maxSupplementSources; i++) {
+              const cat = chips[i];
+              const catEndpoint = (cat === 'trending')
+                ? `/api/trending?page=0`
+                : `/api/search?q=${encodeURIComponent(cat)}&page=0`;
+              supplementPromises.push(fetchEndpoint(catEndpoint));
+            }
+
+            const supplementResults = await Promise.all(supplementPromises);
+            // Flatten and combine
+            const combined = items.concat(...supplementResults.flat());
+            // Deduplicate by id while preserving order
+            const seen = new Set();
+            const deduped = [];
+            for (const it of combined) {
+              if (!it || !it.id) continue;
+              if (seen.has(it.id)) continue;
+              seen.add(it.id);
+              deduped.push(it);
+            }
+
+            // Shuffle the combined deduped list to mix categories
+            items = shuffleArray(deduped);
+          }
+        }
 
         if (items.length === 0 && page === 0) {
            videoGrid.innerHTML = '<p style="text-align:center; width:100%;">動画が見つかりませんでした。</p>';
         }
 
+        // Render items but ensure no duplicates across pages
         items.forEach(item => {
+          if (!item || !item.id) return;
           if (displayedIds.has(item.id)) return;
           displayedIds.add(item.id);
 
