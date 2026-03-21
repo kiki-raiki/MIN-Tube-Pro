@@ -100,10 +100,8 @@ app.get("/api/trending", async (req, res) => {
 
     for (const item of combined) {
       // 厳格なフィルタリング
-      // (1) 動画のみ (2) Shorts除外 (3) 重複除外 (4) チャンネルやプレイリストを除外
+      // (1) 動画のみ (2) Shorts除外 → 削除 (3) 重複除外 (4) チャンネルやプレイリストを除外
       if (item.type === 'video' && 
-          !item.title.toLowerCase().includes('#shorts') && 
-          !item.title.toLowerCase().includes('shorts') &&
           !seenIdsServer.has(item.id)) {
         
         // 人気動画らしい「指標（視聴回数テキスト）」があるかチェック（任意）
@@ -124,6 +122,7 @@ app.get("/api/trending", async (req, res) => {
     res.json({ items: [] });
   }
 });
+
 
 app.get("/api/search", async (req, res, next) => {
   const query = req.query.q;
