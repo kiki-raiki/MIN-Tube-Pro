@@ -18,7 +18,6 @@ app.use(cookieParser());
 
 let apiListCache = [];
 
-// APIキャッシュの更新
 async function updateApiListCache() {
   try {
     const response = await fetch(API_HEALTH_CHECKER);
@@ -30,7 +29,7 @@ async function updateApiListCache() {
       }
     }
   } catch (err) {
-    console.error("API update failed, using fallback.");
+    console.error("API update failed.");
   }
 }
 
@@ -46,7 +45,6 @@ function fetchWithTimeout(url, options = {}, timeout = 5000) {
   ]);
 }
 
-// ミドルウェア: 人間確認
 app.use(async (req, res, next) => {
   if (req.path.startsWith("/api") || req.path.startsWith("/video") || req.path === "/") {
     if (!req.cookies || req.cookies.humanVerified !== "true") {
@@ -84,58 +82,67 @@ app.get("/api/search", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ★進化したパーフェクト・レコメンド・アルゴリズム★
+// ★★★ 全ジャンル対応：ユニバーサル・レコメンド・アルゴリズム ★★★
 app.get("/api/recommendations", async (req, res) => {
   const { title, channel, id } = req.query;
   try {
-    // 1. タイトルから曲名部分を推測 (ハイフンがあればその前後)
-    const titleParts = title.split(' - ');
-    const songName = titleParts.length > 1 ? titleParts[1].split('(')[0].trim() : title.split('(')[0].trim();
-    const artistName = channel.replace(' - Topic', '').trim();
+    // 1. タイトルのクリーニング（ノイズ除去）
+    // 【】, (), [], 記号、日付、4K/HDなどの画質表記を消して核心単語を抽出
+    const coreTitle = title
+      .replace(/[【】「」()!！?？\[\]]/g, ' ')
+      .replace(/\d{4}年|\d{1,2}月\d{1,2}日/g, '')
+      .replace(/ver\.\d+|4K|HD|1080p|60fps/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-    // 2. 3つの異なる意図で並列検索を実行
-    const [relatedRes, channelRes, mixRes] = await Promise.all([
-      yts.GetListByKeyword(`${songName} official`, false, 8),      // 関連曲（公式優先）
-      yts.GetListByKeyword(`${artistName}`, false, 8),            // 同じアーティストの他の曲
-      yts.GetListByKeyword(`${artistName} mix music`, false, 8)   // ジャンルが似ている曲
-    ]);
+    // 単語に分解して、意味のありそうな長い単語を抽出
+    const words = coreTitle.split(' ').filter(w => w.length >= 2);
+    const mainTopic = words.length > 0 ? words.slice(0, 3).join(' ') : coreTitle;
 
-    let rawList = [
-      ...(relatedRes.items || []),
-      ...(channelRes.items || []),
-      ...(mixRes.items || [])
+    // 2. 複数の意図で並列検索（ジャンルを問わず関連性を高める）
+    const searchTasks = [
+      yts.GetListByKeyword(`${mainTopic}`, false, 10),              // A: 同じ題材
+      yts.GetListByKeyword(`${channel}`, false, 6),                // B: 同じ投稿者の別動画
+      yts.GetListByKeyword(`${mainTopic} 関連`, false, 6)           // C: 関連する別トピック
     ];
 
-    // 3. 高度なフィルタリングロジック
-    const seenIds = new Set([id]); // 今見ている動画を排除
-    const seenTitles = new Set();
-    const finalItems = [];
+    const searchResults = await Promise.all(searchTasks);
+    
+    // 3. データの結合と高度なフィルタリング
+    let combinedItems = [];
+    searchResults.forEach(res => {
+      if (res && res.items) combinedItems = [...combinedItems, ...res.items];
+    });
 
-    for (const item of rawList) {
+    const seenIds = new Set([id]);
+    const seenNormalizedTitles = new Set();
+    const finalRecommendations = [];
+
+    for (const item of combinedItems) {
       if (!item.id || seenIds.has(item.id)) continue;
 
-      // タイトルの正規化（小文字化、スペース削除、歌詞等のキーワード削除）
-      const normalizedTitle = item.title.toLowerCase()
-        .replace(/\(.*\)|\[.*\]/g, '') // カッコ内を削除
-        .replace(/official|lyrics|music video|video|audio/g, '') // 一般的な語句を削除
-        .trim();
+      // タイトルの正規化（重複判定用）
+      // 歌詞、公式、やり方などの差分を無視して「同じネタ」を排除
+      const normalized = item.title.toLowerCase()
+        .replace(/\s+/g, '')
+        .replace(/official|lyrics|mv|musicvideo|video|解説|実況|検証|方法|紹介/g, '');
 
-      // すでに似たタイトルの動画がリストにある場合はスキップ（多様性を確保）
-      if (seenTitles.has(normalizedTitle)) continue;
+      // 似すぎているタイトルはスキップして多様性を出す
+      if (seenNormalizedTitles.has(normalized.substring(0, 15))) continue;
 
       seenIds.add(item.id);
-      seenTitles.add(normalizedTitle);
-      finalItems.push(item);
+      seenNormalizedTitles.add(normalized.substring(0, 15));
+      finalRecommendations.push(item);
 
-      if (finalItems.length >= 15) break; // 最大15件
+      if (finalRecommendations.length >= 20) break;
     }
 
-    // 4. 結果をシャッフル（YouTubeの「次に再生」のランダム性を再現）
-    const shuffled = finalItems.sort(() => 0.5 - Math.random());
+    // 4. YouTubeらしい「適度なバラつき」を作るためのシャッフル
+    const result = finalRecommendations.sort(() => 0.5 - Math.random());
     
-    res.json({ items: shuffled });
+    res.json({ items: result });
   } catch (err) {
-    console.error("Rec Error:", err);
+    console.error("Recommendation Engine Error:", err);
     res.json({ items: [] });
   }
 });
@@ -203,6 +210,7 @@ app.get("/video/:id", async (req, res, next) => {
             background: var(--bg-main);
             color: var(--text-main);
             font-family: "Roboto", "Arial", sans-serif;
+            overflow-x: hidden;
         }
 
         .navbar {
@@ -210,13 +218,12 @@ app.get("/video/:id", async (req, res, next) => {
             background: var(--bg-main);
             display: flex; align-items: center; justify-content: space-between;
             padding: 0 16px; box-sizing: border-box; z-index: 1000;
-            border-bottom: 1px solid #222;
         }
-        .nav-left { display: flex; align-items: center; gap: 16px; }
-        .logo { display: flex; align-items: center; color: white; text-decoration: none; font-weight: bold; font-size: 18px; }
+        .nav-left { display: flex; align-items: center; gap: 16px; font-size: 20px; }
+        .logo { display: flex; align-items: center; color: white; text-decoration: none; font-weight: bold; }
         .logo i { color: var(--yt-red); font-size: 24px; margin-right: 4px; }
         
-        .nav-center { flex: 0 1 600px; display: flex; }
+        .nav-center { flex: 0 1 720px; display: flex; align-items: center; }
         .search-bar {
             display: flex; width: 100%;
             background: #121212; border: 1px solid #303030; border-radius: 40px 0 0 40px;
@@ -224,7 +231,7 @@ app.get("/video/:id", async (req, res, next) => {
         }
         .search-bar input {
             width: 100%; background: transparent; border: none; color: white;
-            height: 38px; font-size: 16px; outline: none;
+            height: 40px; font-size: 16px; outline: none;
         }
         .search-btn {
             background: #222; border: 1px solid #303030; border-left: none;
@@ -233,10 +240,10 @@ app.get("/video/:id", async (req, res, next) => {
         }
 
         .container {
-            margin-top: 56px; display: flex; justify-content: center;
-            padding: 24px; gap: 24px; max-width: 1700px; margin-left: auto; margin-right: auto;
+            margin-top: 72px; display: flex; justify-content: center;
+            padding: 0 24px; gap: 24px; max-width: 1700px; margin-left: auto; margin-right: auto;
         }
-        .main-content { flex: 1; min-width: 0; }
+        .main-content { flex: 1; max-width: 1280px; min-width: 0; }
         .sidebar { width: 400px; flex-shrink: 0; }
 
         .player-container {
@@ -245,43 +252,38 @@ app.get("/video/:id", async (req, res, next) => {
         }
         .player-container video, .player-container iframe { width: 100%; height: 100%; border: none; }
 
-        .video-title { font-size: 20px; font-weight: bold; margin: 12px 0; line-height: 28px; }
-        .owner-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .video-title { font-size: 20px; font-weight: bold; margin: 12px 0 8px 0; line-height: 28px; }
+        .owner-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .owner-info { display: flex; align-items: center; gap: 12px; }
-        .owner-info img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .owner-info img { width: 40px; height: 40px; border-radius: 50%; background: #333; }
         .channel-name { font-weight: bold; font-size: 16px; }
-        
         .btn-sub {
             background: white; color: black; border: none;
             padding: 0 16px; height: 36px; border-radius: 18px;
-            font-weight: bold; cursor: pointer;
-        }
-        .action-btn {
-            background: var(--bg-secondary); border: none; color: white;
-            padding: 0 16px; height: 36px; border-radius: 18px;
-            cursor: pointer; font-size: 14px;
+            font-weight: bold; cursor: pointer; margin-left: 12px;
         }
 
         .description-box {
             background: var(--bg-secondary); border-radius: 12px;
-            padding: 12px; font-size: 14px; margin-bottom: 24px;
+            padding: 12px; font-size: 14px; line-height: 20px;
+            margin-bottom: 24px;
         }
 
-        .comment-item { display: flex; gap: 16px; margin-bottom: 20px; }
+        .comment-item { display: flex; gap: 16px; margin-bottom: 24px; }
         .comment-avatar { width: 40px; height: 40px; border-radius: 50%; }
         .comment-author { font-weight: bold; font-size: 13px; margin-bottom: 4px; display: block; }
 
         .rec-item { display: flex; gap: 8px; margin-bottom: 12px; cursor: pointer; text-decoration: none; color: inherit; }
-        .rec-thumb { width: 160px; height: 90px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #222; }
+        .rec-thumb { width: 168px; height: 94px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #222; }
         .rec-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .rec-title { font-size: 14px; font-weight: bold; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .rec-meta { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 
-        @media (max-width: 1000px) {
+        @media (max-width: 1100px) {
             .container { flex-direction: column; padding: 0; }
-            .sidebar { width: 100%; padding: 16px; box-sizing: border-box; }
+            .sidebar { width: 100%; padding: 12px; box-sizing: border-box; }
+            .main-content { padding: 12px; }
             .player-container { border-radius: 0; }
-            .main-content { padding: 16px; }
         }
     </style>
 </head>
@@ -297,7 +299,7 @@ app.get("/video/:id", async (req, res, next) => {
             <button type="submit" class="search-btn"><i class="fas fa-search"></i></button>
         </form>
     </div>
-    <div style="width:100px;"></div>
+    <div class="nav-right" style="width: 40px;"></div>
 </nav>
 
 <div class="container">
@@ -309,12 +311,13 @@ app.get("/video/:id", async (req, res, next) => {
         <div class="owner-row">
             <div class="owner-info">
                 <img src="${videoData.channelImage || 'https://via.placeholder.com/40'}">
-                <div class="channel-name">${videoData.channelName}</div>
+                <div>
+                    <div class="channel-name">${videoData.channelName}</div>
+                </div>
                 <button class="btn-sub">チャンネル登録</button>
             </div>
             <div style="display:flex; gap:8px;">
-                <button class="action-btn">👍 ${videoData.likeCount || 0}</button>
-                <button class="action-btn">共有</button>
+                <button class="btn-sub" style="background:var(--bg-secondary); color:white;">👍 ${videoData.likeCount || 0}</button>
             </div>
         </div>
         <div class="description-box">
@@ -323,15 +326,17 @@ app.get("/video/:id", async (req, res, next) => {
         </div>
         <div class="comments-section">
             <h3>コメント ${commentsData.commentCount} 件</h3>
-            ${commentsData.comments.map(c => `
-                <div class="comment-item">
-                    <img class="comment-avatar" src="${c.authorThumbnails?.[0]?.url || ''}">
-                    <div>
-                        <span class="comment-author">${c.author}</span>
-                        <div style="font-size:14px;">${c.content}</div>
+            <div id="commentsList">
+                ${commentsData.comments.map(c => `
+                    <div class="comment-item">
+                        <img class="comment-avatar" src="${c.authorThumbnails?.[0]?.url || ''}">
+                        <div>
+                            <span class="comment-author">${c.author}</span>
+                            <div style="font-size:14px;">${c.content}</div>
+                        </div>
                     </div>
-                </div>
-            `).join('')}
+                `).join('')}
+            </div>
         </div>
     </div>
     <div class="sidebar">
@@ -349,7 +354,8 @@ app.get("/video/:id", async (req, res, next) => {
         const res = await fetch(\`/api/recommendations?\${params.toString()}\`);
         const data = await res.json();
         
-        document.getElementById('recommendations').innerHTML = data.items.map(item => \`
+        const recContainer = document.getElementById('recommendations');
+        recContainer.innerHTML = data.items.map(item => \`
             <a href="/video/\${item.id}" class="rec-item">
                 <div class="rec-thumb"><img src="https://i.ytimg.com/vi/\${item.id}/mqdefault.jpg"></div>
                 <div class="rec-info">
@@ -368,12 +374,11 @@ app.get("/video/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// --- OTHERS ---
 app.get("/nothing/*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "home.html"));
 });
 
-app.get("/api/save-history", express.json(), (req, res) => {
+app.post("/api/save-history", express.json(), (req, res) => {
   res.json({ success: true });
 });
 
@@ -382,4 +387,4 @@ app.use((err, req, res, next) => {
   res.status(500).sendFile(path.join(__dirname, "public", "error.html"));
 });
 
-app.listen(port, () => console.log(`Server running on port \${port}`));
+app.listen(port, () => console.log(`Server is running on port \${port}`));
