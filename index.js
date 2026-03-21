@@ -298,10 +298,10 @@ app.get("/video/:id", async (req, res, next) => {
 
 <style>
 
-/* ===== 全体 ===== */
+/* ===== 基本 ===== */
 body{
   margin:0;
-  font-family: Roboto, Arial, sans-serif;
+  font-family: "Roboto","Noto Sans JP",Arial,sans-serif;
   background:#0f0f0f;
   color:#fff;
 }
@@ -311,60 +311,90 @@ body{
   position:fixed;
   top:0;
   width:100%;
+  height:56px;
+  background:#0f0f0f;
   display:flex;
   align-items:center;
-  padding:10px 20px;
-  background:#0f0f0f;
+  padding:0 16px;
   border-bottom:1px solid #222;
   z-index:999;
 }
 
+.menu{
+  font-size:20px;
+  margin-right:16px;
+  cursor:pointer;
+}
+
 .logo{
   color:#ff0000;
-  font-weight:bold;
-  font-size:20px;
+  font-weight:700;
+  font-size:18px;
   margin-right:20px;
 }
 
-#search-form{
+.search{
   flex:1;
   display:flex;
   max-width:600px;
 }
 
-#search-input{
+.search input{
   flex:1;
   padding:10px;
   background:#121212;
-  border:1px solid #333;
-  color:#fff;
+  border:1px solid #303030;
+  color:white;
 }
 
-#search-form button{
-  background:#ff0000;
-  border:none;
+.search button{
+  background:#222;
+  border:1px solid #303030;
   color:white;
-  padding:10px 15px;
+  padding:10px 16px;
   cursor:pointer;
 }
 
 /* ===== レイアウト ===== */
-.container{
-  margin-top:70px;
+.layout{
   display:flex;
+  margin-top:56px;
+}
+
+/* ===== サイドバー ===== */
+.sidebar{
+  width:220px;
+  background:#0f0f0f;
+  padding:10px;
+  border-right:1px solid #222;
+}
+
+.side-link{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px;
+  cursor:pointer;
+  border-radius:8px;
+}
+
+.side-link:hover{
+  background:#272727;
+}
+
+/* ===== メイン ===== */
+.main{
+  flex:1;
   padding:20px;
+  display:flex;
   gap:20px;
 }
 
-.main{
+/* ===== 動画 ===== */
+.video-wrap{
   flex:3;
 }
 
-.sidebar{
-  flex:1.5;
-}
-
-/* ===== 動画 ===== */
 .video-player iframe,
 .video-player video{
   width:100%;
@@ -375,15 +405,14 @@ body{
 /* ===== タイトル ===== */
 .title{
   font-size:18px;
-  margin:10px 0;
+  margin:12px 0;
 }
 
 /* ===== チャンネル ===== */
-.channel-box{
+.channel{
   display:flex;
-  align-items:center;
   justify-content:space-between;
-  margin:10px 0;
+  align-items:center;
 }
 
 .channel-left{
@@ -399,10 +428,11 @@ body{
 
 .subscribe{
   background:#cc0000;
-  border:none;
   color:white;
+  border:none;
   padding:10px 16px;
   cursor:pointer;
+  border-radius:20px;
 }
 
 /* ===== アクション ===== */
@@ -412,23 +442,19 @@ body{
   margin:10px 0;
 }
 
-.action-btn{
+.action{
   background:#272727;
-  border:none;
-  padding:8px 12px;
-  color:white;
+  padding:8px 14px;
+  border-radius:20px;
   cursor:pointer;
 }
 
-.action-btn:hover{
-  background:#444;
-}
-
 /* ===== 説明 ===== */
-.description{
+.desc{
   background:#1f1f1f;
-  padding:10px;
-  border-radius:8px;
+  padding:12px;
+  border-radius:10px;
+  font-size:14px;
 }
 
 /* ===== コメント ===== */
@@ -439,7 +465,7 @@ body{
 .comment{
   display:flex;
   gap:10px;
-  margin-bottom:15px;
+  margin-bottom:16px;
 }
 
 .comment img{
@@ -447,38 +473,35 @@ body{
   border-radius:50%;
 }
 
-.comment-body{
-  flex:1;
-}
-
-.comment-author{
-  font-weight:bold;
-  font-size:13px;
-}
-
-.comment-text{
-  font-size:14px;
-}
-
 /* ===== サイド動画 ===== */
-.side-item{
+.recommend{
+  flex:1.5;
+}
+
+.rec-item{
   display:flex;
   gap:10px;
   margin-bottom:12px;
   cursor:pointer;
 }
 
-.side-item img{
-  width:160px;
+.rec-item img{
+  width:168px;
 }
 
-.side-title{
+.rec-title{
   font-size:14px;
 }
 
-.side-channel{
+.rec-channel{
   font-size:12px;
   color:#aaa;
+}
+
+/* ===== レスポンシブ ===== */
+@media(max-width:1000px){
+  .sidebar{display:none;}
+  .main{flex-direction:column;}
 }
 
 </style>
@@ -487,24 +510,34 @@ body{
 <body>
 
 <div class="header">
+  <div class="menu">☰</div>
   <div class="logo">Youtube-Pro</div>
 
-  <form id="search-form">
-    <input id="search-input" placeholder="検索">
-    <button>検索</button>
+  <form class="search" id="searchForm">
+    <input id="q" placeholder="検索">
+    <button>🔍</button>
   </form>
 </div>
 
-<div class="container">
+<div class="layout">
 
+<!-- サイドバー -->
+<div class="sidebar">
+  <div class="side-link">🏠 ホーム</div>
+  <div class="side-link">🔥 急上昇</div>
+  <div class="side-link">📺 登録チャンネル</div>
+</div>
+
+<!-- メイン -->
 <div class="main">
+
+<div class="video-wrap">
 
   <div class="video-player" id="player"></div>
 
   <div class="title">${videoData.videoTitle || ""}</div>
 
-  <!-- チャンネル -->
-  <div class="channel-box">
+  <div class="channel">
     <div class="channel-left">
       <img src="${videoData.channelImage || ""}">
       <div>
@@ -516,45 +549,41 @@ body{
     <button class="subscribe">登録</button>
   </div>
 
-  <!-- アクション -->
   <div class="actions">
-    <button class="action-btn">👍 ${videoData.likeCount || 0}</button>
-    <button class="action-btn">共有</button>
-    <button class="action-btn">保存</button>
+    <div class="action">👍 ${videoData.likeCount || 0}</div>
+    <div class="action">共有</div>
+    <div class="action">保存</div>
   </div>
 
-  <!-- 説明 -->
-  <div class="description">
-    <p>${videoData.videoViews || 0} 回視聴</p>
-    <p>${videoData.videoDes || ""}</p>
+  <div class="desc">
+    ${videoData.videoViews || 0} 回視聴<br>
+    ${videoData.videoDes || ""}
   </div>
 
-  <!-- コメント -->
   <div class="comments">
-    <h3>コメント ${commentsData.commentCount || 0}</h3>
+    <h3>コメント ${commentsData.commentCount}</h3>
     ${commentsHTML}
   </div>
 
 </div>
 
-<!-- サイド -->
-<div class="sidebar" id="sidebar"></div>
+<!-- 右 -->
+<div class="recommend" id="rec"></div>
 
+</div>
 </div>
 
 <script>
 
-const streamHTML = \`${streamEmbedHTML.replace(/`/g,"\\`")}\`;
-const youtubeHTML = \`${youtubeEmbedHTML.replace(/`/g,"\\`")}\`;
+const stream = \`${streamEmbedHTML.replace(/`/g,"\\`")}\`;
+const yt = \`${youtubeEmbedHTML.replace(/`/g,"\\`")}\`;
 
-/* 初期再生 */
-document.getElementById("player").innerHTML = streamHTML;
+document.getElementById("player").innerHTML = stream;
 
 /* 検索 */
-document.getElementById("search-form").onsubmit = e=>{
+document.getElementById("searchForm").onsubmit=e=>{
   e.preventDefault();
-  const q = document.getElementById("search-input").value;
-  location.href = "/nothing/search?q=" + encodeURIComponent(q);
+  location.href="/nothing/search?q="+encodeURIComponent(q.value);
 };
 
 /* サイド動画 */
@@ -564,21 +593,21 @@ fetch('/api/playlist?channelName=${videoData.channelName}')
   let html="";
   d.playlist.forEach(v=>{
     html+=\`
-      <div class="side-item" onclick="location.href='/video/\${v.id}'">
+      <div class="rec-item" onclick="location.href='/video/\${v.id}'">
         <img src="https://i3.ytimg.com/vi/\${v.id}/mqdefault.jpg">
         <div>
-          <div class="side-title">\${v.title}</div>
-          <div class="side-channel">${videoData.channelName}</div>
+          <div class="rec-title">\${v.title}</div>
+          <div class="rec-channel">${videoData.channelName}</div>
         </div>
       </div>
     \`;
   });
-  document.getElementById("sidebar").innerHTML = html;
+  rec.innerHTML=html;
 });
 
-/* プレイヤー切替（ダブルクリックで） */
-document.getElementById("player").ondblclick = ()=>{
-  document.getElementById("player").innerHTML = youtubeHTML;
+/* ダブルクリックで切替 */
+player.ondblclick=()=>{
+  player.innerHTML=yt;
 };
 
 </script>
