@@ -244,7 +244,7 @@ app.get("/video/:id", async (req, res, next) => {
     const isShortForm = videoData.videoTitle.includes('#');
 
     if (isShortForm) {
-      // --- SHORTS MODE HTML ---
+      // --- SHORTS MODE HTML (PERFECTED DESIGN) ---
       const shortsHtml = `
 <!DOCTYPE html>
 <html lang="ja">
@@ -259,12 +259,24 @@ app.get("/video/:id", async (req, res, next) => {
         .shorts-wrapper {
             position: relative; width: 100%; height: 100%;
             display: flex; justify-content: center; align-items: center;
+            background: #000;
         }
 
         .video-container {
-            position: relative; width: 100%; height: 100%;
-            max-width: 500px; /* PC閲覧時のスマホ風サイズ */
+            position: relative;
+            height: 94vh; /* 画面に収まるよう少し小さく */
+            aspect-ratio: 9/16;
             background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 600px) {
+            .video-container { height: 100%; width: 100%; border-radius: 0; }
         }
 
         video, iframe {
@@ -272,50 +284,63 @@ app.get("/video/:id", async (req, res, next) => {
             object-fit: cover; border: none;
         }
 
-        /* グラデーションオーバーレイ */
+        /* 進行状況バー */
+        .progress-container {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 2px;
+            background: rgba(255,255,255,0.2); z-index: 12;
+        }
+        .progress-bar { height: 100%; background: #ff0000; width: 0%; transition: width 0.1s linear; }
+
         .bottom-overlay {
             position: absolute; bottom: 0; left: 0; width: 100%;
-            padding: 80px 16px 20px;
-            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            padding: 100px 16px 24px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
             z-index: 5; pointer-events: none;
         }
         .bottom-overlay * { pointer-events: auto; }
 
-        .channel-info { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-        .channel-info img { width: 36px; height: 36px; border-radius: 50%; }
-        .channel-name { font-weight: bold; font-size: 15px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .channel-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .channel-info img { width: 32px; height: 32px; border-radius: 50%; }
+        .channel-name { font-weight: 500; font-size: 15px; }
         .subscribe-btn {
             background: #fff; color: #000; border: none; padding: 6px 12px;
-            border-radius: 18px; font-size: 12px; font-weight: bold; cursor: pointer;
+            border-radius: 18px; font-size: 12px; font-weight: bold; cursor: pointer; margin-left: 8px;
         }
 
         .video-title {
-            font-size: 14px; line-height: 1.4; margin-bottom: 10px;
+            font-size: 14px; line-height: 1.4; margin-bottom: 8px; font-weight: 400;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
 
-        /* 右サイドのアクションボタン */
         .side-bar {
-            position: absolute; right: 8px; bottom: 100px;
-            display: flex; flex-direction: column; gap: 18px; align-items: center;
+            position: absolute; right: 8px; bottom: 80px;
+            display: flex; flex-direction: column; gap: 16px; align-items: center;
             z-index: 10;
         }
-        .action-btn {
-            display: flex; flex-direction: column; align-items: center; cursor: pointer;
-        }
+        .action-btn { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
         .btn-icon {
-            width: 48px; height: 48px; background: rgba(255,255,255,0.15);
+            width: 44px; height: 44px; background: rgba(255,255,255,0.12);
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 22px; transition: 0.2s; margin-bottom: 4px;
+            font-size: 20px; transition: 0.2s; margin-bottom: 4px;
         }
-        .btn-icon:active { transform: scale(0.9); background: rgba(255,255,255,0.3); }
-        .action-btn span { font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .btn-icon:active { transform: scale(0.9); background: rgba(255,255,255,0.25); }
+        .action-btn span { font-size: 11px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-weight: 400; }
 
-        /* コメントオーバーレイ */
+        /* スワイプヒント */
+        .swipe-hint {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.6); padding: 12px 20px; border-radius: 30px;
+            display: flex; align-items: center; gap: 10px; z-index: 50;
+            opacity: 0; pointer-events: none; transition: opacity 0.5s;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .swipe-hint.show { opacity: 1; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, -60%); } }
+
         .comments-panel {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 65%;
-            background: #1c1c1c; border-radius: 12px 12px 0 0;
-            z-index: 20; transform: translateY(100%); transition: transform 0.3s ease-out;
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 70%;
+            background: #181818; border-radius: 16px 16px 0 0;
+            z-index: 20; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex; flex-direction: column;
         }
         .comments-panel.open { transform: translateY(0); }
@@ -323,15 +348,15 @@ app.get("/video/:id", async (req, res, next) => {
             padding: 16px; border-bottom: 1px solid #333;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .comments-header h3 { margin: 0; font-size: 16px; }
-        .close-comments { font-size: 20px; cursor: pointer; padding: 4px; }
-
         .comments-body { flex: 1; overflow-y: auto; padding: 16px; }
-        .comment-item { display: flex; gap: 12px; margin-bottom: 20px; }
+        .comment-item { display: flex; gap: 12px; margin-bottom: 18px; }
         .comment-avatar { width: 32px; height: 32px; border-radius: 50%; }
-        .comment-content { flex: 1; }
-        .comment-user { font-size: 12px; color: #aaa; margin-bottom: 4px; font-weight: bold; }
-        .comment-text { font-size: 14px; line-height: 1.4; }
+
+        .top-nav {
+            position: absolute; top: 16px; left: 16px; z-index: 15;
+            display: flex; align-items: center; color: white; text-decoration: none;
+        }
+        .top-nav i { font-size: 20px; filter: drop-shadow(0 0 4px rgba(0,0,0,0.5)); }
 
         .loading-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -339,13 +364,6 @@ app.get("/video/:id", async (req, res, next) => {
             opacity: 0; pointer-events: none; transition: 0.3s;
         }
         .loading-screen.active { opacity: 1; }
-
-        .top-nav {
-            position: absolute; top: 12px; left: 12px; z-index: 15;
-            display: flex; gap: 20px; align-items: center;
-        }
-        .top-nav i { font-size: 22px; cursor: pointer; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
-
     </style>
 </head>
 <body>
@@ -354,21 +372,26 @@ app.get("/video/:id", async (req, res, next) => {
 
     <div class="shorts-wrapper">
         <div class="video-container">
-            <div class="top-nav">
-                <a href="/" style="color:white;"><i class="fas fa-arrow-left"></i></a>
+            <a href="/" class="top-nav"><i class="fas fa-arrow-left"></i></a>
+
+            <div id="swipeHint" class="swipe-hint">
+                <i class="fas fa-hand-pointer"></i>
+                <span>下にスワイプして次の動画へ移動</span>
             </div>
 
             ${videoData.stream_url !== "youtube-nocookie" 
                 ? `<video id="videoPlayer" src="${videoData.stream_url}" autoplay loop playsinline></video>` 
-                : `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=0&loop=1&playlist=${videoId}&modestbranding=1" allow="autoplay"></iframe>`
+                : `<iframe id="videoIframe" src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=0&loop=1&playlist=${videoId}&modestbranding=1&rel=0" allow="autoplay"></iframe>`
             }
+
+            <div class="progress-container"><div id="progressBar" class="progress-bar"></div></div>
 
             <div class="side-bar">
                 <div class="action-btn"><div class="btn-icon"><i class="fas fa-thumbs-up"></i></div><span>${videoData.likeCount || '評価'}</span></div>
                 <div class="action-btn"><div class="btn-icon"><i class="fas fa-thumbs-down"></i></div><span>低評価</span></div>
                 <div class="action-btn" onclick="toggleComments()"><div class="btn-icon"><i class="fas fa-comment-dots"></i></div><span>${commentsData.commentCount || 0}</span></div>
                 <div class="action-btn"><div class="btn-icon"><i class="fas fa-share"></i></div><span>共有</span></div>
-                <div class="action-btn"><div class="btn-icon"><i class="fas fa-ellipsis-h"></i></div></div>
+                <div class="action-btn"><div class="btn-icon" style="background:none;"><img src="${videoData.channelImage}" style="width:30px; height:30px; border-radius:4px; border:2px solid #fff;"></div></div>
             </div>
 
             <div class="bottom-overlay">
@@ -382,16 +405,16 @@ app.get("/video/:id", async (req, res, next) => {
 
             <div id="commentsPanel" class="comments-panel">
                 <div class="comments-header">
-                    <h3>コメント (${commentsData.commentCount})</h3>
-                    <i class="fas fa-times close-comments" onclick="toggleComments()"></i>
+                    <h3 style="margin:0; font-size:16px;">コメント</h3>
+                    <i class="fas fa-times" style="cursor:pointer;" onclick="toggleComments()"></i>
                 </div>
                 <div class="comments-body">
                     ${commentsData.comments.length > 0 ? commentsData.comments.map(c => `
                         <div class="comment-item">
                             <img class="comment-avatar" src="${c.authorThumbnails?.[0]?.url || 'https://via.placeholder.com/32'}">
-                            <div class="comment-content">
-                                <div class="comment-user">${c.author}</div>
-                                <div class="comment-text">${c.content}</div>
+                            <div>
+                                <div style="font-size:12px; color:#aaa; font-weight:bold;">${c.author}</div>
+                                <div style="font-size:14px; margin-top:2px;">${c.content}</div>
                             </div>
                         </div>
                     `).join('') : '<p style="text-align:center; color:#888;">コメントはありません</p>'}
@@ -404,6 +427,23 @@ app.get("/video/:id", async (req, res, next) => {
         let startY = 0;
         const loader = document.getElementById('loader');
         const commentsPanel = document.getElementById('commentsPanel');
+        const swipeHint = document.getElementById('swipeHint');
+        const video = document.getElementById('videoPlayer');
+        const progressBar = document.getElementById('progressBar');
+
+        // 初回ヒント表示
+        window.onload = () => {
+            swipeHint.classList.add('show');
+            setTimeout(() => { swipeHint.classList.remove('show'); }, 4000);
+        };
+
+        // プログレスバーの更新
+        if (video) {
+            video.ontimeupdate = () => {
+                const percent = (video.currentTime / video.duration) * 100;
+                progressBar.style.width = percent + '%';
+            };
+        }
 
         function toggleComments() {
             commentsPanel.classList.toggle('open');
@@ -429,21 +469,18 @@ app.get("/video/:id", async (req, res, next) => {
             } catch (e) { window.location.href = '/'; }
         }
 
-        // スワイプ・スクロール検知
+        // スワイプ検知
         window.addEventListener('touchstart', e => startY = e.touches[0].pageY);
         window.addEventListener('touchend', e => {
             const endY = e.changedTouches[0].pageY;
-            if (startY - endY > 80) loadNextShort();
+            if (startY - endY > 100) loadNextShort(); // 下から上にスワイプ
         });
         window.addEventListener('wheel', e => {
             if (e.deltaY > 50) loadNextShort();
         }, { passive: true });
 
-        // 背景クリックでコメントを閉じる
         document.addEventListener('click', (e) => {
-            if (commentsPanel.classList.contains('open') && 
-                !commentsPanel.contains(e.target) && 
-                !e.target.closest('.action-btn')) {
+            if (commentsPanel.classList.contains('open') && !commentsPanel.contains(e.target) && !e.target.closest('.action-btn')) {
                 toggleComments();
             }
         });
@@ -453,7 +490,7 @@ app.get("/video/:id", async (req, res, next) => {
       return res.send(shortsHtml);
     }
 
-    // --- STANDARD VIDEO MODE HTML ---
+    // --- STANDARD VIDEO MODE HTML (NO CHANGES) ---
     const streamEmbed = videoData.stream_url !== "youtube-nocookie"
       ? `<video controls autoplay poster="https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg">
            <source src="${videoData.stream_url}" type="video/mp4">
