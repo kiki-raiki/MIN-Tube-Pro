@@ -594,6 +594,28 @@ app.get("/video/:id", async (req, res, next) => {
         .rec-title { font-size: 14px; font-weight: bold; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .rec-meta { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
 
+        /* Shorts specific styles to mimic YouTube Shorts look */
+        .shorts-section { margin-bottom: 16px; background: transparent; }
+        .shorts-header { display:flex; align-items:center; justify-content:space-between; margin: 8px 0; }
+        .shorts-title { font-weight: 700; font-size: 14px; display:flex; align-items:center; gap:8px; }
+        .shorts-pill { background: var(--yt-red); color: white; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .shorts-scroll { display:flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+        .short-card {
+            min-width: 140px; width: 140px; height: 250px; background: #111; border-radius: 12px; overflow: hidden;
+            display:flex; flex-direction:column; text-decoration:none; color:inherit; box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        .short-card:hover { transform: translateY(-6px); box-shadow: 0 8px 20px rgba(0,0,0,0.6); }
+        .short-thumb { width: 100%; height: 170px; background: #222; display:block; object-fit:cover; }
+        .short-info { padding: 8px; display:flex; flex-direction:column; gap:6px; }
+        .short-title { font-size: 13px; font-weight:700; line-height:1.2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .short-channel { font-size: 12px; color: var(--text-sub); }
+
+        /* Make sidebar look closer to YouTube: compact list + subtle separators */
+        .sidebar { padding: 8px 0; }
+        .rec-item { padding: 6px 4px; border-radius: 8px; }
+        .rec-item:hover { background: rgba(255,255,255,0.02); }
+
         @media (max-width: 1000px) {
             .container { flex-direction: column; padding: 0; }
             .sidebar { width: 100%; padding: 16px; box-sizing: border-box; }
@@ -665,16 +687,74 @@ app.get("/video/:id", async (req, res, next) => {
         });
         const res = await fetch(\`/api/recommendations?\${params.toString()}\`);
         const data = await res.json();
-        
-        document.getElementById('recommendations').innerHTML = data.items.map(item => \`
-            <a href="/video/\${item.id}" class="rec-item">
-                <div class="rec-thumb"><img src="https://i.ytimg.com/vi/\${item.id}/mqdefault.jpg"></div>
-                <div class="rec-info">
-                    <div class="rec-title">\${item.title}</div>
-                    <div class="rec-meta">\${item.channelTitle}</div>
-                </div>
-            </a>
-        \`).join('');
+
+        // Separate shorts (title contains '#') and normal items
+        const items = Array.isArray(data.items) ? data.items : [];
+        const shorts = items.filter(item => typeof item.title === 'string' && item.title.includes('#'));
+        const normals = items.filter(item => ! (typeof item.title === 'string' && item.title.includes('#')));
+
+        const recRoot = document.getElementById('recommendations');
+        let htmlParts = [];
+
+        // If there are shorts, render a dedicated Shorts section (YouTube-like compact horizontal cards)
+        if (shorts.length > 0) {
+            const shortsHtml = shorts.map(item => {
+                // sanitize values for insertion into template literal
+                const id = String(item.id || '');
+                const title = String(item.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const channel = String(item.channelTitle || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                // Use the YouTube thumbnail pattern for shorts as well (tall preview is simulated by CSS)
+                const thumb = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+                return `
+                    <a href="/video/${id}" class="short-card" aria-label="${title}">
+                        <img class="short-thumb" src="${thumb}" alt="${title}">
+                        <div class="short-info">
+                            <div class="short-title">${title}</div>
+                            <div class="short-channel">${channel}</div>
+                        </div>
+                    </a>
+                `;
+            }).join('');
+
+            htmlParts.push(`
+                <section class="shorts-section" aria-label="Shorts">
+                    <div class="shorts-header">
+                        <div class="shorts-title"><span class="shorts-pill">Shorts</span><span style="opacity:.9;">おすすめのショート</span></div>
+                        <div style="font-size:12px;color:var(--text-sub);">全て表示</div>
+                    </div>
+                    <div class="shorts-scroll">
+                        ${shortsHtml}
+                    </div>
+                </section>
+            `);
+        }
+
+        // Render normal recommendations in the classic vertical list
+        if (normals.length > 0) {
+            const normalsHtml = normals.map(item => {
+                const id = String(item.id || '');
+                const title = String(item.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const channel = String(item.channelTitle || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const thumb = `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+                return `
+                    <a href="/video/${id}" class="rec-item">
+                        <div class="rec-thumb"><img src="${thumb}" alt="${title}"></div>
+                        <div class="rec-info">
+                            <div class="rec-title">${title}</div>
+                            <div class="rec-meta">${channel}</div>
+                        </div>
+                    </a>
+                `;
+            }).join('');
+            htmlParts.push(`<div class="rec-list">${normalsHtml}</div>`);
+        }
+
+        // If there were no items at all, show a subtle placeholder
+        if (items.length === 0) {
+            htmlParts.push('<div style="color:var(--text-sub);font-size:13px;padding:12px;">おすすめ動画はありません</div>');
+        }
+
+        recRoot.innerHTML = htmlParts.join('');
     }
     window.onload = loadRecommendations;
 </script>
