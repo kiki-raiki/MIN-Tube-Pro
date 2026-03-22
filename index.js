@@ -241,7 +241,6 @@ app.get("/video/:id", async (req, res, next) => {
       } catch (e) {}
     }
 
-    // タイトルに # が含まれているか判定
     const isShortForm = videoData.videoTitle.includes('#');
 
     if (isShortForm) {
@@ -255,61 +254,163 @@ app.get("/video/:id", async (req, res, next) => {
     <title>${videoData.videoTitle}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
-        .shorts-container { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .video-wrapper { position: relative; width: 100%; height: 100%; max-width: 500px; background: #000; }
-        video, iframe { width: 100%; height: 100%; object-fit: cover; border: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: "Roboto", sans-serif; overflow: hidden; }
         
-        .overlay { position: absolute; bottom: 0; left: 0; width: 100%; padding: 20px; box-sizing: border-box; background: linear-gradient(transparent, rgba(0,0,0,0.8)); z-index: 10; }
-        .channel-info { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .channel-info img { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #fff; }
-        .channel-name { font-weight: bold; font-size: 16px; }
-        .video-desc { font-size: 14px; margin-bottom: 40px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .shorts-wrapper {
+            position: relative; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+        }
 
-        .side-actions { position: absolute; right: 10px; bottom: 100px; display: flex; flex-direction: column; gap: 20px; align-items: center; z-index: 11; }
-        .action-item { display: flex; flex-direction: column; align-items: center; font-size: 12px; cursor: pointer; }
-        .action-item i { font-size: 28px; margin-bottom: 5px; }
+        .video-container {
+            position: relative; width: 100%; height: 100%;
+            max-width: 500px; /* PC閲覧時のスマホ風サイズ */
+            background: #000;
+        }
 
-        .loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        video, iframe {
+            width: 100%; height: 100%;
+            object-fit: cover; border: none;
+        }
+
+        /* グラデーションオーバーレイ */
+        .bottom-overlay {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            padding: 80px 16px 20px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            z-index: 5; pointer-events: none;
+        }
+        .bottom-overlay * { pointer-events: auto; }
+
+        .channel-info { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .channel-info img { width: 36px; height: 36px; border-radius: 50%; }
+        .channel-name { font-weight: bold; font-size: 15px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .subscribe-btn {
+            background: #fff; color: #000; border: none; padding: 6px 12px;
+            border-radius: 18px; font-size: 12px; font-weight: bold; cursor: pointer;
+        }
+
+        .video-title {
+            font-size: 14px; line-height: 1.4; margin-bottom: 10px;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+
+        /* 右サイドのアクションボタン */
+        .side-bar {
+            position: absolute; right: 8px; bottom: 100px;
+            display: flex; flex-direction: column; gap: 18px; align-items: center;
+            z-index: 10;
+        }
+        .action-btn {
+            display: flex; flex-direction: column; align-items: center; cursor: pointer;
+        }
+        .btn-icon {
+            width: 48px; height: 48px; background: rgba(255,255,255,0.15);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 22px; transition: 0.2s; margin-bottom: 4px;
+        }
+        .btn-icon:active { transform: scale(0.9); background: rgba(255,255,255,0.3); }
+        .action-btn span { font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+
+        /* コメントオーバーレイ */
+        .comments-panel {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 65%;
+            background: #1c1c1c; border-radius: 12px 12px 0 0;
+            z-index: 20; transform: translateY(100%); transition: transform 0.3s ease-out;
+            display: flex; flex-direction: column;
+        }
+        .comments-panel.open { transform: translateY(0); }
+        .comments-header {
+            padding: 16px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .comments-header h3 { margin: 0; font-size: 16px; }
+        .close-comments { font-size: 20px; cursor: pointer; padding: 4px; }
+
+        .comments-body { flex: 1; overflow-y: auto; padding: 16px; }
+        .comment-item { display: flex; gap: 12px; margin-bottom: 20px; }
+        .comment-avatar { width: 32px; height: 32px; border-radius: 50%; }
+        .comment-content { flex: 1; }
+        .comment-user { font-size: 12px; color: #aaa; margin-bottom: 4px; font-weight: bold; }
+        .comment-text { font-size: 14px; line-height: 1.4; }
+
+        .loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 100; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: 0.3s;
+        }
         .loading-screen.active { opacity: 1; }
-        
-        .back-btn { position: absolute; top: 20px; left: 20px; z-index: 20; font-size: 24px; color: #fff; text-decoration: none; text-shadow: 0 0 5px rgba(0,0,0,0.5); }
+
+        .top-nav {
+            position: absolute; top: 12px; left: 12px; z-index: 15;
+            display: flex; gap: 20px; align-items: center;
+        }
+        .top-nav i { font-size: 22px; cursor: pointer; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+
     </style>
 </head>
 <body>
-    <a href="/" class="back-btn"><i class="fas fa-arrow-left"></i></a>
+
     <div id="loader" class="loading-screen"><i class="fas fa-circle-notch fa-spin fa-2x"></i></div>
 
-    <div class="shorts-container" id="shortsContainer">
-        <div class="video-wrapper">
-            ${videoData.stream_url !== "youtube-nocookie" 
-                ? `<video id="mainVideo" src="${videoData.stream_url}" autoplay loop playsinline></video>` 
-                : `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=0&loop=1&playlist=${videoId}" allow="autoplay"></iframe>`
-            }
-            
-            <div class="overlay">
-                <div class="channel-info">
-                    <img src="${videoData.channelImage || 'https://via.placeholder.com/40'}">
-                    <span class="channel-name">${videoData.channelName}</span>
-                </div>
-                <div class="video-desc">${videoData.videoTitle}</div>
+    <div class="shorts-wrapper">
+        <div class="video-container">
+            <div class="top-nav">
+                <a href="/" style="color:white;"><i class="fas fa-arrow-left"></i></a>
             </div>
 
-            <div class="side-actions">
-                <div class="action-item"><i class="fas fa-thumbs-up"></i><span>${videoData.likeCount || 'Like'}</span></div>
-                <div class="action-item"><i class="fas fa-comment-dots"></i><span>${commentsData.commentCount || 0}</span></div>
-                <div class="action-item"><i class="fas fa-share"></i><span>共有</span></div>
+            ${videoData.stream_url !== "youtube-nocookie" 
+                ? `<video id="videoPlayer" src="${videoData.stream_url}" autoplay loop playsinline></video>` 
+                : `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=0&loop=1&playlist=${videoId}&modestbranding=1" allow="autoplay"></iframe>`
+            }
+
+            <div class="side-bar">
+                <div class="action-btn"><div class="btn-icon"><i class="fas fa-thumbs-up"></i></div><span>${videoData.likeCount || '評価'}</span></div>
+                <div class="action-btn"><div class="btn-icon"><i class="fas fa-thumbs-down"></i></div><span>低評価</span></div>
+                <div class="action-btn" onclick="toggleComments()"><div class="btn-icon"><i class="fas fa-comment-dots"></i></div><span>${commentsData.commentCount || 0}</span></div>
+                <div class="action-btn"><div class="btn-icon"><i class="fas fa-share"></i></div><span>共有</span></div>
+                <div class="action-btn"><div class="btn-icon"><i class="fas fa-ellipsis-h"></i></div></div>
+            </div>
+
+            <div class="bottom-overlay">
+                <div class="channel-info">
+                    <img src="${videoData.channelImage || 'https://via.placeholder.com/40'}">
+                    <span class="channel-name">@${videoData.channelName}</span>
+                    <button class="subscribe-btn">登録</button>
+                </div>
+                <div class="video-title">${videoData.videoTitle}</div>
+            </div>
+
+            <div id="commentsPanel" class="comments-panel">
+                <div class="comments-header">
+                    <h3>コメント (${commentsData.commentCount})</h3>
+                    <i class="fas fa-times close-comments" onclick="toggleComments()"></i>
+                </div>
+                <div class="comments-body">
+                    ${commentsData.comments.length > 0 ? commentsData.comments.map(c => `
+                        <div class="comment-item">
+                            <img class="comment-avatar" src="${c.authorThumbnails?.[0]?.url || 'https://via.placeholder.com/32'}">
+                            <div class="comment-content">
+                                <div class="comment-user">${c.author}</div>
+                                <div class="comment-text">${c.content}</div>
+                            </div>
+                        </div>
+                    `).join('') : '<p style="text-align:center; color:#888;">コメントはありません</p>'}
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         let startY = 0;
-        const container = document.getElementById('shortsContainer');
         const loader = document.getElementById('loader');
+        const commentsPanel = document.getElementById('commentsPanel');
 
-        // 次のショート動画を検索して遷移する
+        function toggleComments() {
+            commentsPanel.classList.toggle('open');
+        }
+
         async function loadNextShort() {
+            if (commentsPanel.classList.contains('open')) return;
             loader.classList.add('active');
             try {
                 const params = new URLSearchParams({
@@ -319,28 +420,32 @@ app.get("/video/:id", async (req, res, next) => {
                 });
                 const res = await fetch(\`/api/recommendations?\${params.toString()}\`);
                 const data = await res.json();
-                
-                // タイトルに # が含まれる動画を優先的に探す
                 const nextShort = data.items.find(item => item.title.includes('#')) || data.items[0];
-                
                 if (nextShort) {
                     window.location.href = '/video/' + nextShort.id;
                 } else {
                     window.location.href = '/';
                 }
-            } catch (e) {
-                window.location.href = '/';
-            }
+            } catch (e) { window.location.href = '/'; }
         }
 
         // スワイプ・スクロール検知
         window.addEventListener('touchstart', e => startY = e.touches[0].pageY);
         window.addEventListener('touchend', e => {
             const endY = e.changedTouches[0].pageY;
-            if (startY - endY > 100) loadNextShort(); // 下から上へのスワイプ
+            if (startY - endY > 80) loadNextShort();
         });
         window.addEventListener('wheel', e => {
-            if (e.deltaY > 50) loadNextShort(); // 下へのスクロール
+            if (e.deltaY > 50) loadNextShort();
+        }, { passive: true });
+
+        // 背景クリックでコメントを閉じる
+        document.addEventListener('click', (e) => {
+            if (commentsPanel.classList.contains('open') && 
+                !commentsPanel.contains(e.target) && 
+                !e.target.closest('.action-btn')) {
+                toggleComments();
+            }
         });
     </script>
 </body>
