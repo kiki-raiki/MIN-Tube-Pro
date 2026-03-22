@@ -250,6 +250,258 @@ app.get("/video/:id", async (req, res, next) => {
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>${videoData.videoTitle}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: "Roboto", sans-serif; overflow: hidden; }
+        
+        .shorts-wrapper {
+            position: relative; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            background: #000;
+        }
+
+        .video-container {
+            position: relative;
+            height: 94vh; /* 画面に収まるよう少し小さく */
+            aspect-ratio: 9/16;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 600px) {
+            .video-container { height: 100%; width: 100%; border-radius: 0; }
+        }
+
+        video, iframe {
+            width: 100%; height: 100%;
+            object-fit: cover; border: none;
+        }
+
+        /* 進行状況バー */
+        .progress-container {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 2px;
+            background: rgba(255,255,255,0.2); z-index: 12;
+        }
+        .progress-bar { height: 100%; background: #ff0000; width: 0%; transition: width 0.1s linear; }
+
+        .bottom-overlay {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            padding: 100px 16px 24px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            z-index: 5; pointer-events: none;
+        }
+        .bottom-overlay * { pointer-events: auto; }
+
+        .channel-info { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .channel-info img { width: 32px; height: 32px; border-radius: 50%; }
+        .channel-name { font-weight: 500; font-size: 15px; }
+        .subscribe-btn {
+            background: #fff; color: #000; border: none; padding: 6px 12px;
+            border-radius: 18px; font-size: 12px; font-weight: bold; cursor: pointer; margin-left: 8px;
+        }
+
+        .video-title {
+            font-size: 14px; line-height: 1.4; margin-bottom: 8px; font-weight: 400;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+
+        .side-bar {
+            position: absolute; right: 8px; bottom: 80px;
+            display: flex; flex-direction: column; gap: 16px; align-items: center;
+            z-index: 10;
+        }
+        .action-btn { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .btn-icon {
+            width: 44px; height: 44px; background: rgba(255,255,255,0.12);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 20px; transition: 0.2s; margin-bottom: 4px;
+        }
+        .btn-icon:active { transform: scale(0.9); background: rgba(255,255,255,0.25); }
+        .action-btn span { font-size: 11px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-weight: 400; }
+
+        /* スワイプヒント */
+        .swipe-hint {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.6); padding: 12px 20px; border-radius: 30px;
+            display: flex; align-items: center; gap: 10px; z-index: 50;
+            opacity: 0; pointer-events: none; transition: opacity 0.5s;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .swipe-hint.show { opacity: 1; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, -60%); } }
+
+        .comments-panel {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 70%;
+            background: #181818; border-radius: 16px 16px 0 0;
+            z-index: 20; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column;
+        }
+        .comments-panel.open { transform: translateY(0); }
+        .comments-header {
+            padding: 16px; border-bottom: 1px solid #333;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .comments-body { flex: 1; overflow-y: auto; padding: 16px; }
+        .comment-item { display: flex; gap: 12px; margin-bottom: 18px; }
+        .comment-avatar { width: 32px; height: 32px; border-radius: 50%; }
+
+        .top-nav {
+            position: absolute; top: 16px; left: 16px; z-index: 15;
+            display: flex; align-items: center; color: white; text-decoration: none;
+        }
+        .top-nav i { font-size: 20px; filter: drop-shadow(0 0 4px rgba(0,0,0,0.5)); }
+
+        .loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 100; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: 0.3s;
+        }
+        .loading-screen.active { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div id="loader" class="loading-screen"><i class="fas fa-circle-notch fa-spin fa-2x"></i></div>
+
+    <div class="shorts-wrapper">
+        <div class="video-container">
+            <a href="/" class="top-nav"><i class="fas fa-arrow-left"></i></a>
+
+            <div id="swipeHint" class="swipe-hint">
+                <i class="fas fa-hand-pointer"></i>
+                <span>下にスワイプして次の動画へ移動</span>
+            </div>
+
+            ${videoData.stream_url !== "youtube-nocookie" 
+                ? `<video id="videoPlayer" src="${videoData.stream_url}" autoplay loop playsinline></video>` 
+                : `<iframe id="videoIframe" src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=0&loop=1&playlist=${videoId}&modestbranding=1&rel=0" allow="autoplay"></iframe>`
+            }
+
+            <div class="progress-container"><div id="progressBar" class="progress-bar"></div></div>
+
+            <div class="side-bar">
+                <div class="action-btn"><div class="btn-icon"><i class="fas fa-thumbs-up"></i></div><span>${videoData.likeCount || '評価'}</span></div>
+                <div class="action-btn"><div class="btn-icon"><i class="fas fa-thumbs-down"></i></div><span>低評価</span></div>
+                <div class="action-btn" onclick="toggleComments()"><div class="btn-icon"><i class="fas fa-comment-dots"></i></div><span>${commentsData.commentCount || 0}</span></div>
+                <div class="action-btn"><div class="btn-icon"><i class="fas fa-share"></i></div><span>共有</span></div>
+                <div class="action-btn"><div class="btn-icon" style="background:none;"><img src="${videoData.channelImage}" style="width:30px; height:30px; border-radius:4px; border:2px solid #fff;"></div></div>
+            </div>
+
+            <div class="bottom-overlay">
+                <div class="channel-info">
+                    <img src="${videoData.channelImage || 'https://via.placeholder.com/40'}">
+                    <span class="channel-name">@${videoData.channelName}</span>
+                    <button class="subscribe-btn">登録</button>
+                </div>
+                <div class="video-title">${videoData.videoTitle}</div>
+            </div>
+
+            <div id="commentsPanel" class="comments-panel">
+                <div class="comments-header">
+                    <h3 style="margin:0; font-size:16px;">コメント</h3>
+                    <i class="fas fa-times" style="cursor:pointer;" onclick="toggleComments()"></i>
+                </div>
+                <div class="comments-body">
+                    ${commentsData.comments.length > 0 ? commentsData.comments.map(c => `
+                        <div class="comment-item">
+                            <img class="comment-avatar" src="${c.authorThumbnails?.[0]?.url || 'https://via.placeholder.com/32'}">
+                            <div>
+                                <div style="font-size:12px; color:#aaa; font-weight:bold;">${c.author}</div>
+                                <div style="font-size:14px; margin-top:2px;">${c.content}</div>
+                            </div>
+                        </div>
+                    `).join('') : '<p style="text-align:center; color:#888;">コメントはありません</p>'}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let startY = 0;
+        const loader = document.getElementById('loader');
+        const commentsPanel = document.getElementById('commentsPanel');
+        const swipeHint = document.getElementById('swipeHint');
+        const video = document.getElementById('videoPlayer');
+        const progressBar = document.getElementById('progressBar');
+
+        // 初回ヒント表示
+        window.onload = () => {
+            swipeHint.classList.add('show');
+            setTimeout(() => { swipeHint.classList.remove('show'); }, 1000);
+        };
+
+        // プログレスバーの更新
+        if (video) {
+            video.ontimeupdate = () => {
+                const percent = (video.currentTime / video.duration) * 100;
+                progressBar.style.width = percent + '%';
+            };
+        }
+
+        function toggleComments() {
+            commentsPanel.classList.toggle('open');
+        }
+
+        async function loadNextShort() {
+            if (commentsPanel.classList.contains('open')) return;
+            loader.classList.add('active');
+            try {
+                const params = new URLSearchParams({
+                    title: "${videoData.videoTitle}",
+                    channel: "${videoData.channelName}",
+                    id: "${videoId}"
+                });
+                const res = await fetch(\`/api/recommendations?\${params.toString()}\`);
+                const data = await res.json();
+                const nextShort = data.items.find(item => item.title.includes('#')) || data.items[0];
+                if (nextShort) {
+                    window.location.href = '/video/' + nextShort.id;
+                } else {
+                    window.location.href = '/';
+                }
+            } catch (e) { window.location.href = '/'; }
+        }
+
+        // スワイプ検知
+        window.addEventListener('touchstart', e => startY = e.touches[0].pageY);
+        window.addEventListener('touchend', e => {
+            const endY = e.changedTouches[0].pageY;
+            if (startY - endY > 100) loadNextShort(); // 下から上にスワイプ
+        });
+        window.addEventListener('wheel', e => {
+            if (e.deltaY > 50) loadNextShort();
+        }, { passive: true });
+
+        document.addEventListener('click', (e) => {
+            if (commentsPanel.classList.contains('open') && !commentsPanel.contains(e.target) && !e.target.closest('.action-btn')) {
+                toggleComments();
+            }
+        });
+    </script>
+</body>
+</html>`;
+      return res.send(shortsHtml);
+    }
+
+    // --- STANDARD VIDEO MODE HTML (NO CHANGES) ---
+    const streamEmbed = videoData.stream_url !== "youtube-nocookie"
+      ? `<video controls autoplay poster="https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg">
+           <source src="${videoData.stream_url}" type="video/mp4">
+         </video>`
+      : `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1" frameborder="0" allowfullscreen></iframe>`;
+
+    const html = `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${videoData.videoTitle} - YouTube Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -499,199 +751,6 @@ app.get("/video/:id", async (req, res, next) => {
             console.error('Error loading recommendations', err);
             document.getElementById('recommendations').innerHTML = '<div style="color:var(--text-sub); font-size:13px;">おすすめの読み込み中にエラーが発生しました</div>';
         }
-    }
-    window.onload = loadRecommendations;
-</script>
-</body>
-</html>`;
-      return res.send(shortsHtml);
-    }
-
-    // --- STANDARD VIDEO MODE HTML (NO CHANGES) ---
-    const streamEmbed = videoData.stream_url !== "youtube-nocookie"
-      ? `<video controls autoplay poster="https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg">
-           <source src="${videoData.stream_url}" type="video/mp4">
-         </video>`
-      : `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1" frameborder="0" allowfullscreen></iframe>`;
-
-    const html = `
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${videoData.videoTitle} - YouTube Pro</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        :root {
-            --bg-main: #0f0f0f;
-            --bg-secondary: #272727;
-            --bg-hover: #3f3f3f;
-            --text-main: #f1f1f1;
-            --text-sub: #aaaaaa;
-            --yt-red: #ff0000;
-        }
-        body {
-            margin: 0; padding: 0;
-            background: var(--bg-main);
-            color: var(--text-main);
-            font-family: "Roboto", "Arial", sans-serif;
-            overflow-x: hidden;
-        }
-
-        .navbar {
-            position: fixed; top: 0; width: 100%; height: 56px;
-            background: var(--bg-main);
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 0 16px; box-sizing: border-box; z-index: 1000;
-            border-bottom: 1px solid #222;
-        }
-        .nav-left { display: flex; align-items: center; gap: 16px; }
-        .logo { display: flex; align-items: center; color: white; text-decoration: none; font-weight: bold; font-size: 18px; }
-        .logo i { color: var(--yt-red); font-size: 24px; margin-right: 4px; }
-        
-        .nav-center { flex: 0 1 600px; display: flex; }
-        .search-bar {
-            display: flex; width: 100%;
-            background: #121212; border: 1px solid #303030; border-radius: 40px 0 0 40px;
-            padding: 0 16px;
-        }
-        .search-bar input {
-            width: 100%; background: transparent; border: none; color: white;
-            height: 38px; font-size: 16px; outline: none;
-        }
-        .search-btn {
-            background: #222; border: 1px solid #303030; border-left: none;
-            border-radius: 0 40px 40px 0; width: 64px; height: 40px;
-            color: white; cursor: pointer;
-        }
-
-        .container {
-            margin-top: 56px; display: flex; justify-content: center;
-            padding: 24px; gap: 24px; max-width: 1700px; margin-left: auto; margin-right: auto;
-        }
-        .main-content { flex: 1; min-width: 0; }
-        .sidebar { width: 400px; flex-shrink: 0; }
-
-        .player-container {
-            width: 100%; aspect-ratio: 16 / 9;
-            background: black; border-radius: 12px; overflow: hidden;
-        }
-        .player-container video, .player-container iframe { width: 100%; height: 100%; border: none; }
-
-        .video-title { font-size: 20px; font-weight: bold; margin: 12px 0; line-height: 28px; }
-        .owner-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-        .owner-info { display: flex; align-items: center; gap: 12px; }
-        .owner-info img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
-        .channel-name { font-weight: bold; font-size: 16px; }
-        
-        .btn-sub {
-            background: white; color: black; border: none;
-            padding: 0 16px; height: 36px; border-radius: 18px;
-            font-weight: bold; cursor: pointer;
-        }
-        .action-btn {
-            background: var(--bg-secondary); border: none; color: white;
-            padding: 0 16px; height: 36px; border-radius: 18px;
-            cursor: pointer; font-size: 14px;
-        }
-
-        .description-box {
-            background: var(--bg-secondary); border-radius: 12px;
-            padding: 12px; font-size: 14px; margin-bottom: 24px;
-        }
-
-        .comment-item { display: flex; gap: 16px; margin-bottom: 20px; }
-        .comment-avatar { width: 40px; height: 40px; border-radius: 50%; }
-        .comment-author { font-weight: bold; font-size: 13px; margin-bottom: 4px; display: block; }
-
-        .rec-item { display: flex; gap: 8px; margin-bottom: 12px; cursor: pointer; text-decoration: none; color: inherit; }
-        .rec-thumb { width: 160px; height: 90px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #222; }
-        .rec-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .rec-title { font-size: 14px; font-weight: bold; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .rec-meta { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
-
-        @media (max-width: 1000px) {
-            .container { flex-direction: column; padding: 0; }
-            .sidebar { width: 100%; padding: 16px; box-sizing: border-box; }
-            .player-container { border-radius: 0; }
-            .main-content { padding: 16px; }
-        }
-    </style>
-</head>
-<body>
-
-<nav class="navbar">
-    <div class="nav-left">
-        <a href="/" class="logo"><i class="fab fa-youtube"></i>YouTube Pro</a>
-    </div>
-    <div class="nav-center">
-        <form class="search-bar" action="/nothing/search">
-            <input type="text" name="q" placeholder="検索">
-            <button type="submit" class="search-btn"><i class="fas fa-search"></i></button>
-        </form>
-    </div>
-    <div style="width:100px;"></div>
-</nav>
-
-<div class="container">
-    <div class="main-content">
-        <div class="player-container">
-            ${streamEmbed}
-        </div>
-        <h1 class="video-title">${videoData.videoTitle}</h1>
-        <div class="owner-row">
-            <div class="owner-info">
-                <img src="${videoData.channelImage || 'https://via.placeholder.com/40'}">
-                <div class="channel-name">${videoData.channelName}</div>
-                <button class="btn-sub">チャンネル登録</button>
-            </div>
-            <div style="display:flex; gap:8px;">
-                <button class="action-btn">👍 ${videoData.likeCount || 0}</button>
-                <button class="action-btn">共有</button>
-            </div>
-        </div>
-        <div class="description-box">
-            <b>${videoData.videoViews || '0'} 回視聴</b><br><br>
-            ${videoData.videoDes || ''}
-        </div>
-        <div class="comments-section">
-            <h3>コメント ${commentsData.commentCount} 件</h3>
-            ${commentsData.comments.map(c => `
-                <div class="comment-item">
-                    <img class="comment-avatar" src="${c.authorThumbnails?.[0]?.url || ''}">
-                    <div>
-                        <span class="comment-author">${c.author}</span>
-                        <div style="font-size:14px;">${c.content}</div>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    </div>
-    <div class="sidebar">
-        <div id="recommendations"></div>
-    </div>
-</div>
-
-<script>
-    async function loadRecommendations() {
-        const params = new URLSearchParams({
-            title: "${videoData.videoTitle}",
-            channel: "${videoData.channelName}",
-            id: "${videoId}"
-        });
-        const res = await fetch(\`/api/recommendations?\${params.toString()}\`);
-        const data = await res.json();
-        
-        document.getElementById('recommendations').innerHTML = data.items.map(item => \`
-            <a href="/video/\${item.id}" class="rec-item">
-                <div class="rec-thumb"><img src="https://i.ytimg.com/vi/\${item.id}/mqdefault.jpg"></div>
-                <div class="rec-info">
-                    <div class="rec-title">\${item.title}</div>
-                    <div class="rec-meta">\${item.channelTitle}</div>
-                </div>
-            </a>
-        \`).join('');
     }
     window.onload = loadRecommendations;
 </script>
