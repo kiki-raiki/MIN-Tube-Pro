@@ -591,57 +591,44 @@ app.get('/rapid/:id', async (req, res) => {
   }
 });
 
+// 新しいエンドポイント /360/:videoId を追加
 app.get('/360/:videoId', async (req, res) => {
-  const videoId = req.params.videoId;
-  
-  const _0x7a1b = "\x68\x74\x74\x70\x73\x3A\x2F\x2F\x67\x65\x74\x6C\x61\x74\x65\x2E\x64\x65\x76\x2F\x61\x70\x69\x2F\x74\x6F\x6F\x6C\x73\x2F\x79\x6F\x75\x74\x75\x62\x65\x2D\x6C\x69\x76\x65\x2D\x64\x6F\x77\x6E\x6C\x6F\x61\x64\x65\x72";
-  const _0x3c9f = [0x2,0x5,0x7,0x11]; // ダミー配列（読みにくくするため）
-  function _0xdec(x){
-    // 意図的に複雑に見えるが元に戻す処理
-    const o = [];
-    for(let i=0;i<x.length;i++){
-      let cc = x.charCodeAt(i);
-      // ビット操作を複数回行う（実質的に元に戻るように調整）
-      cc = ((cc << 1) & 0xff) | ((cc >>> 7) & 0x01);
-      cc = cc ^ 0x00;
-      cc = (cc & 0xff);
-      o.push(String.fromCharCode(cc));
+    const videoId = req.params.videoId;
+
+    // 1. 暗号化したテキスト(16進数配列)を最初に定義
+    const _0x1a = [0x79, 0x85, 0x85, 0x81, 0x84, 0x4b, 0x40, 0x40, 0x78, 0x76, 0x85, 0x7d, 0x72, 0x85, 0x76, 0x3f, 0x75, 0x76, 0x87, 0x40, 0x72, 0x81, 0x7a, 0x40, 0x85, 0x80, 0x80, 0x7d, 0x84, 0x40, 0x8a, 0x80, 0x86, 0x85, 0x86, 0x73, 0x76, 0x3e, 0x7d, 0x7a, 0x87, 0x76, 0x3e, 0x75, 0x80, 0x88, 0x7f, 0x7d, 0x80, 0x72, 0x75, 0x76, 0x83, 0x50, 0x86, 0x83, 0x7d, 0x4e, 0x79, 0x85, 0x85, 0x81, 0x84, 0x36, 0x44, 0x52, 0x36, 0x43, 0x57, 0x36, 0x43, 0x57, 0x88, 0x88, 0x88, 0x3f, 0x8a, 0x80, 0x86, 0x85, 0x86, 0x73, 0x76, 0x3f, 0x74, 0x80, 0x7e, 0x36, 0x43, 0x57, 0x88, 0x72, 0x85, 0x74, 0x79, 0x36, 0x44, 0x57, 0x87, 0x36, 0x44, 0x55];
+    const _0x2b = [0x37, 0x77, 0x80, 0x83, 0x7e, 0x72, 0x85, 0x5a, 0x75, 0x4e, 0x43];
+
+    // 2. 暗号を復元 (文字列操作メソッド名も難読化)
+    const _0x11 = ['\x6d\x61\x70', '\x66\x72\x6f\x6d\x43\x68\x61\x72\x43\x6f\x64\x65', '\x6a\x6f\x69\x6e'];
+    const _0x4d = _0x1a[_0x11[0]](_0x5e => String[_0x11[1]](_0x5e - 0x11))[_0x11[2]]('');
+    const _0x5e = _0x2b[_0x11[0]](_0x6f => String[_0x11[1]](_0x6f - 0x11))[_0x11[2]]('');
+
+    // 3. 新しく定義し対象のURLを構築
+    const targetUrl = _0x4d + videoId + _0x5e;
+
+    // 4. 既存の処理を行う (以下のコードは一切変更していません)
+    try {
+        // 指定されたUser-Agentでリクエストを送信
+        const response = await fetch(targetUrl, {
+            method: 'GET',
+            headers: {
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
+            },
+            // node-fetchのデフォルトは 'follow' ですが、明示的に指定することも可能です
+            redirect: 'follow'
+        });
+
+        // リダイレクトチェーンを追跡した結果の最終URLは response.url に格納されます
+        const finalUrl = response.url;
+
+        // 最終リダイレクト先のURLをそのままテキストとして返す
+        res.type('text/plain').send(finalUrl);
+    } catch (error) {
+        console.error('Error fetching the URL:', error);
+        res.status(500).send('Internal Server Error');
     }
-    o.reverse();
-    o.reverse();
-    // ダミーループで時間を稼ぐ（副作用なし）
-    for(let j=0;j<_0x3c9f.length;j++){
-      const _tmp = (_0x3c9f[j] * 0x1) ^ 0x0;
-      if(_tmp === 0xdead) { break; }
-    }
-    return o.join('').replace(/\u0000/g,'');
-  }
-
-  // 復元して targetUrl を生成（暗号化テキストを復元してからクエリ部分を連結）
-  const _base = _0xdec(_0x7a1b);
-  const targetUrl = `${_base}?url=+https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3D${videoId}&formatId=2`;
-
-  try {
-    // 指定されたUser-Agentでリクエストを送信
-    const response = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
-      },
-      // node-fetchのデフォルトは 'follow' ですが、明示的に指定することも可能です
-      redirect: 'follow' 
-    });
-
-    // リダイレクトチェーンを追跡した結果の最終URLは response.url に格納されます
-    const finalUrl = response.url;
-
-    // 最終リダイレクト先のURLをそのままテキストとして返す
-    res.type('text/plain').send(finalUrl);
-
-  } catch (error) {
-    console.error('Error fetching the URL:', error);
-    res.status(500).send('Internal Server Error');
-  }
+});
   
 app.use((req, res) => res.status(404).sendFile(path.join(__dirname, "public", "error.html")));
 app.use((err, req, res, next) => {
