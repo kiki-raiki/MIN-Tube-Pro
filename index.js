@@ -642,6 +642,434 @@ app.get('/nocookie/:id', (req, res) => {
   res.send(url);
 });
 
+// 既存の app を使う想定
+app.get('/pro-stream/:videoId', (req, res) => {
+  const videoId = req.params.videoId;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pro Stream - ${videoId}</title>
+<style>
+  :root{--bg:#0b0f14;--card:#0f1720;--accent:#00d1ff;--muted:#9aa6b2}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#07101a 0%, #071827 100%);font-family:Inter,system-ui,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:#e6eef6}
+  .wrap{height:100vh;display:flex;flex-direction:column}
+  header{padding:18px 24px;display:flex;align-items:center;gap:12px}
+  header h1{font-size:18px;margin:0}
+  main{flex:1;display:grid;grid-template-columns:1fr 360px;gap:18px;padding:18px}
+  /* プレイヤー領域 */
+  .player-stage{position:relative;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.15));border-radius:12px;overflow:hidden;min-height:360px}
+  .layer{position:absolute;inset:0;transition:opacity .6s ease, transform .6s ease;display:flex;align-items:center;justify-content:center}
+  .layer iframe{width:100%;height:100%;border:0}
+  .layer.hidden{display:none}
+  .layer.inactive{opacity:0;pointer-events:none;transform:scale(1.02)}
+  .layer.active{opacity:1;pointer-events:auto;transform:scale(1)}
+  /* サイドパネル */
+  .panel{background:var(--card);border-radius:12px;padding:16px;color:#cfe9f6;box-shadow:0 6px 18px rgba(2,6,12,0.6)}
+  .list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+  .item{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+  .item .meta{font-size:13px;color:var(--muted)}
+  .controls{display:flex;gap:8px;margin-top:12px}
+  button{background:var(--accent);border:0;color:#022;padding:8px 12px;border-radius:8px;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#cfe9f6}
+  /* ローディングオーバーレイ */
+  .overlay{position:absolute;inset:0;background:linear-gradient(180deg, rgba(2,6,12,0.6), rgba(2,6,12,0.75));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:60}
+  .loader{width:120px;height:120px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#06202a,#0b2b36);box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+  .dots{display:flex;gap:6px}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);opacity:.2;animation:blink 1.2s infinite}
+  .dot:nth-child(1){animation-delay:0s}
+  .dot:nth-child(2){animation-delay:.15s}
+  .dot:nth-child(3){animation-delay:.3s}
+  @keyframes blink{0%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-6px)}100%{opacity:.2;transform:translateY(0)}}
+  .status{color:#dff7ff;font-weight:600}
+  .sub{color:var(--muted);font-size:13px}
+  /* レスポンシブ */
+  @media (max-width:900px){main{grid-template-columns:1fr;padding:12px}.panel{order:2}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Pro Stream</h1>
+    <div style="color:var(--muted);font-size:13px">動画ID: <strong style="color:#fff">${videoId}</strong></div>
+  </header>
+
+  <main>
+    <section class="player-stage" id="stage">
+      <div class="overlay" id="overlay">
+        <div class="loader" aria-hidden="true">
+          <div class="dots" aria-hidden="true">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          </div>
+        </div>
+        <div class="status" id="status">初期化中…</div>
+        <div class="sub" id="sub">エンドポイントに接続しています</div>
+      </div>
+      <!-- 動的に .layer を追加 -->
+    </section>
+
+    <aside class="panel">
+      <div style="font-weight:700">エンドポイント状況</div>
+      <div class="list" id="endpointList"></div>
+
+      <div class="controls">
+        <button id="showNext">次を表示</button>
+        <button class="ghost" id="toggleMute">ミュート切替</button>
+      </div>
+
+      <div style="margin-top:12px;color:var(--muted);font-size:13px">
+        自動再生はブラウザポリシーに依存します。再生されない場合は画面を一度タップしてください。
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+/* ======= 設定 ======= */
+const VIDEO_ID = ${JSON.stringify(videoId)};
+const ENDPOINTS = [
+  {name:'/360', path:'/360/' + VIDEO_ID},
+  {name:'/scratch-edu', path:'/scratch-edu/' + VIDEO_ID},
+  {name:'/kahoot-edu', path:'/kahoot-edu/' + VIDEO_ID},
+  {name:'/nocookie', path:'/nocookie/' + VIDEO_ID}
+];
+const PLAYABLE_TIMEOUT = 9000; // ms: プレイヤーが再生を開始しないと失敗とみなす
+/* ===================== */
+
+const stage = document.getElementById('stage');
+const overlay = document.getElementById('overlay');
+const statusEl = document.getElementById('status');
+const subEl = document.getElementById('sub');
+const endpointList = document.getElementById('endpointList');
+const showNextBtn = document.getElementById('showNext');
+const toggleMuteBtn = document.getElementById('toggleMute');
+
+let layers = []; // {name, url, el, playerType, playerObj, state}
+let activeIndex = -1;
+let globalMuted = true;
+
+/* ユーティリティ */
+function setStatus(main, sub){
+  statusEl.textContent = main;
+  subEl.textContent = sub || '';
+}
+
+/* 1) 各エンドポイントから URL を取得 */
+async function fetchAllUrls(){
+  setStatus('エンドポイントに接続中', '動画URLを取得しています');
+  const results = [];
+  for(const ep of ENDPOINTS){
+    const row = {name: ep.name, url: null, ok:false, error:null};
+    try{
+      const res = await fetch(ep.path, {cache:'no-store'});
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const text = (await res.text()).trim();
+      // 取得結果が空でないか確認
+      if(text){
+        row.url = text;
+        row.ok = true;
+      } else {
+        row.error = '空のレスポンス';
+      }
+    }catch(err){
+      row.error = err.message || String(err);
+    }
+    results.push(row);
+    updateEndpointList(results);
+  }
+  return results;
+}
+
+/* 2) サイドパネル更新 */
+function updateEndpointList(results){
+  endpointList.innerHTML = '';
+  results.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = '<div><div style="font-weight:700">'+r.name+'</div><div class="meta">'+(r.url? r.url : r.error)+'</div></div>' +
+                    '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">' +
+                    '<div class="meta">'+(r.ok? '取得済':'失敗')+'</div>' +
+                    '<button class="ghost" data-idx="'+i+'">表示</button></div>';
+    endpointList.appendChild(div);
+    div.querySelector('button').addEventListener('click', ()=>{ showLayer(i); });
+  });
+}
+
+/* 3) レイヤー作成とプレイヤー初期化 */
+function createLayerObject(name, url, idx){
+  const layer = document.createElement('div');
+  layer.className = 'layer inactive';
+  layer.dataset.idx = idx;
+  // iframe を作る
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('allow','autoplay; fullscreen; picture-in-picture');
+  iframe.setAttribute('allowfullscreen','');
+  iframe.src = url;
+  layer.appendChild(iframe);
+  stage.appendChild(layer);
+  return {name, url, el: layer, iframe, playerType: detectPlayerType(url), playerObj: null, state: 'init'};
+}
+
+function detectPlayerType(url){
+  const u = url.toLowerCase();
+  if(u.includes('youtube.com') || u.includes('youtube-nocookie.com') || u.includes('youtubeeducation.com')) return 'youtube';
+  // 他の埋め込みサービスがあればここで判定可能
+  return 'iframe';
+}
+
+/* YouTube IFrame API を使う準備 */
+let YTready = false;
+let YTqueue = [];
+function loadYouTubeAPI(){
+  if(window.YT && window.YT.Player){ YTready = true; return Promise.resolve(); }
+  return new Promise((resolve) => {
+    window.onYouTubeIframeAPIReady = function(){
+      YTready = true;
+      resolve();
+      // キュー処理
+      YTqueue.forEach(fn => fn());
+      YTqueue = [];
+    };
+    const s = document.createElement('script');
+    s.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(s);
+  });
+}
+
+/* YouTube プレイヤー初期化 */
+function initYouTubePlayer(layerObj){
+  return new Promise((resolve) => {
+    const iframe = layerObj.iframe;
+    // ensure enablejsapi=1
+    if(!/enablejsapi=1/.test(iframe.src)){
+      const sep = iframe.src.includes('?') ? '&' : '?';
+      iframe.src = iframe.src + sep + 'enablejsapi=1&origin=' + encodeURIComponent(location.origin);
+    }
+    const onInit = () => {
+      try{
+        const player = new YT.Player(iframe, {
+          events: {
+            onReady: (e) => {
+              // ミュートして再生を試みる
+              try{ e.target.mute(); e.target.playVideo(); }catch(e){}
+              layerObj.playerObj = e.target;
+              resolve({ok:true, player:e.target});
+            },
+            onStateChange: (ev) => {
+              // 1 = playing, 2 = paused, 0 = ended
+              if(ev.data === YT.PlayerState.PLAYING){
+                layerObj.state = 'playing';
+              } else if(ev.data === YT.PlayerState.PAUSED){
+                layerObj.state = 'paused';
+              }
+            }
+          }
+        });
+      }catch(err){
+        resolve({ok:false, error:err});
+      }
+    };
+    if(YTready) onInit();
+    else YTqueue.push(onInit);
+  });
+}
+
+/* iframe 型（YouTube以外）の簡易チェック：load イベントで成功とみなす */
+function initGenericIframe(layerObj){
+  return new Promise((resolve) => {
+    const iframe = layerObj.iframe;
+    let resolved = false;
+    const onLoad = () => {
+      if(resolved) return;
+      resolved = true;
+      layerObj.state = 'loaded';
+      resolve({ok:true});
+    };
+    const onErr = () => {
+      if(resolved) return;
+      resolved = true;
+      resolve({ok:false, error:'iframe load error'});
+    };
+    iframe.addEventListener('load', onLoad, {once:true});
+    // タイムアウトで失敗扱い
+    setTimeout(()=>{ if(!resolved) onErr(); }, PLAYABLE_TIMEOUT);
+  });
+}
+
+/* 4) 全レイヤーを初期化して再生確認 */
+async function initLayers(results){
+  setStatus('プレイヤー初期化中', '埋め込みを作成しています');
+  // まず YouTube API を必要なら読み込む
+  const needYT = results.some(r => r.ok && (/youtube/i.test(r.url) || /youtubeeducation/i.test(r.url)));
+  if(needYT) await loadYouTubeAPI();
+
+  let idx = 0;
+  for(const r of results){
+    if(!r.ok) { idx++; continue; }
+    const obj = createLayerObject(r.name, r.url, idx);
+    layers.push(obj);
+    idx++;
+  }
+
+  // 初期化と再生確認
+  setStatus('再生確認中', '各プレイヤーの再生を確認しています');
+  const checks = layers.map((l, i) => checkPlayable(l, i));
+  const outcomes = await Promise.all(checks);
+
+  // 成功したものだけ残す
+  layers = layers.filter((l, i) => outcomes[i] && outcomes[i].ok);
+  // DOM上で失敗した layer は削除
+  const removed = document.querySelectorAll('.layer');
+  // 既に stage にある layer 要素は layers に合わせて整理
+  const keepEls = new Set(layers.map(l=>l.el));
+  document.querySelectorAll('.layer').forEach(el=>{
+    if(!keepEls.has(el)) el.remove();
+  });
+
+  if(layers.length === 0){
+    setStatus('再生できる動画がありません', '別の動画IDをお試しください');
+    overlay.querySelector('.loader').style.display = 'none';
+    return;
+  }
+
+  // 最初の表示を決める
+  activeIndex = 0;
+  updateLayerVisibility();
+  setStatus('準備完了', '再生中の動画を切り替えられます');
+  overlay.style.display = 'none';
+}
+
+/* 各レイヤーの再生確認ロジック */
+function checkPlayable(layerObj, idx){
+  return new Promise(async (resolve) => {
+    layerObj.el.style.zIndex = 10 + idx;
+    // タイムアウトで失敗扱い
+    let timedOut = false;
+    const to = setTimeout(()=>{ timedOut = true; resolve({ok:false, error:'timeout'}); }, PLAYABLE_TIMEOUT);
+
+    if(layerObj.playerType === 'youtube'){
+      const res = await initYouTubePlayer(layerObj);
+      clearTimeout(to);
+      if(timedOut) return;
+      if(res.ok){
+        // ミュート状態にして再生を確認（ブラウザが自動再生を許可しない場合は playVideo が失敗する）
+        try{
+          res.player.mute();
+          res.player.playVideo();
+        }catch(e){}
+        // さらに短い待ちで playing 状態になったか確認
+        const checkStart = Date.now();
+        const checkInterval = setInterval(()=>{
+          const state = res.player.getPlayerState ? res.player.getPlayerState() : null;
+          if(state === YT.PlayerState.PLAYING){
+            clearInterval(checkInterval);
+            clearTimeout(to);
+            layerObj.state = 'playing';
+            resolve({ok:true});
+          } else if(Date.now() - checkStart > 3000){
+            clearInterval(checkInterval);
+            clearTimeout(to);
+            // 再生開始しないが iframe 自体はロードされたとみなす（ユーザー操作で再生可能）
+            layerObj.state = 'ready';
+            resolve({ok:true});
+          }
+        }, 300);
+      } else {
+        resolve({ok:false, error:res.error});
+      }
+    } else {
+      // generic iframe
+      const res = await initGenericIframe(layerObj);
+      clearTimeout(to);
+      if(res.ok) resolve({ok:true});
+      else resolve({ok:false, error:res.error});
+    }
+  });
+}
+
+/* レイヤー表示更新（activeIndex に基づく） */
+function updateLayerVisibility(){
+  layers.forEach((l, i) => {
+    if(i === activeIndex){
+      l.el.classList.remove('inactive'); l.el.classList.remove('hidden'); l.el.classList.add('active');
+    } else {
+      l.el.classList.remove('active'); l.el.classList.add('inactive');
+    }
+  });
+}
+
+/* 次を表示 */
+function showNext(){
+  if(layers.length === 0) return;
+  activeIndex = (activeIndex + 1) % layers.length;
+  updateLayerVisibility();
+}
+
+/* 指定インデックスを表示（サイドパネルのボタンから） */
+function showLayer(panelIdx){
+  // panelIdx は endpoint の index。 layers 配列は endpoint の順序と一致する保証はないのでマッチング
+  const targetName = ENDPOINTS[panelIdx] ? ENDPOINTS[panelIdx].name : null;
+  if(!targetName) return;
+  const idx = layers.findIndex(l => l.name === targetName);
+  if(idx >= 0){
+    activeIndex = idx;
+    updateLayerVisibility();
+  }
+}
+
+/* ミュート切替（YouTube プレイヤーに反映） */
+function toggleMute(){
+  globalMuted = !globalMuted;
+  layers.forEach(l => {
+    if(l.playerType === 'youtube' && l.playerObj && l.playerObj.getPlayerState){
+      try{
+        if(globalMuted) l.playerObj.mute();
+        else l.playerObj.unMute();
+      }catch(e){}
+    } else {
+      // iframe generic は制御不可
+    }
+  });
+  toggleMuteBtn.textContent = globalMuted ? 'ミュート中' : 'ミュート解除';
+}
+
+/* 初期フロー */
+(async function main(){
+  try{
+    setStatus('初期化中', 'エンドポイント一覧を準備しています');
+    const results = await fetchAllUrls();
+    setStatus('URL取得完了', 'プレイヤーを初期化します');
+    await initLayers(results);
+  }catch(err){
+    console.error(err);
+    setStatus('エラーが発生しました', String(err));
+  }
+})();
+
+/* イベント */
+showNextBtn.addEventListener('click', showNext);
+toggleMuteBtn.addEventListener('click', toggleMute);
+
+/* タップでオーバーレイ解除（自動再生ブロック時のユーザー操作） */
+stage.addEventListener('click', ()=> {
+  if(overlay.style.display === 'none') return;
+  overlay.style.display = 'none';
+  // ユーザー操作として再生を再試行
+  layers.forEach(l => {
+    if(l.playerType === 'youtube' && l.playerObj && l.playerObj.playVideo){
+      try{ l.playerObj.playVideo(); }catch(e){}
+    } else {
+      // nothing
+    }
+  });
+});
+</script>
+</body>
+</html>`);
+});
+
 
 
 app.use((req, res) => res.status(404).sendFile(path.join(__dirname, "public", "error.html")));
