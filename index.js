@@ -466,7 +466,7 @@ const shortsHtml = `
                         <i class="fas fa-server"></i> 動画サーバー <i class="fas fa-chevron-down" style="font-size: 12px; margin-left: 2px;"></i>
                     </button>
                     <div id="serverMenu" class="server-menu">
-                        <div class="server-option active" onclick="changeServer('googlevideo', '', event)">Googlevideo</div>
+                        <div id="defaultServerOpt" class="server-option active" onclick="changeServer('googlevideo', '', event)">Googlevideo</div>
                         <div class="server-option" onclick="changeServer('youtube-nocookie', '/nocookie/${videoId}', event)">Youtube-nocookie</div>
                         <div class="server-option" onclick="changeServer('DL-Pro', '/360/${videoId}', event)">DL-Pro</div>
                         <div class="server-option" onclick="changeServer('YoutubeEdu-Kahoot', '/kahoot-edu/${videoId}', event)">YoutubeEdu-Kahoot</div>
@@ -506,80 +506,86 @@ const shortsHtml = `
         document.getElementById('serverMenu').classList.remove('show');
         const options = document.querySelectorAll('.server-option');
         options.forEach(opt => opt.classList.remove('active'));
-        event.currentTarget.classList.add('active');
+        
+        if (event && event.currentTarget) {
+            event.currentTarget.classList.add('active');
+        } else {
+            document.getElementById('defaultServerOpt').classList.add('active');
+        }
 
         const overlay = document.getElementById('videoLoadingOverlay');
         overlay.classList.add('active');
 
         try {
             let newUrl = '';
-            // --- ロジックの条件分岐 ---
             if (serverName === 'googlevideo') {
-                newUrl = "${videoData.stream_url}" === "youtube-nocookie" ? \`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1\` : "${videoData.stream_url}";
+                newUrl = "${videoData.stream_url}" === "youtube-nocookie" ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1` : "${videoData.stream_url}";
             } else if (serverName === 'Youtube-Pro') {
-                // Youtube-ProはエンドポイントURLをそのまま使用
                 newUrl = endpointPath;
             } else {
-                // それ以外はサーバーから生のURLを取得
                 const res = await fetch(endpointPath);
                 if (!res.ok) throw new Error("サーバーエラー");
                 newUrl = await res.text();
             }
 
             const playerContainer = document.getElementById('playerWrapper');
-            // Kahoot, Scratch, Youtube-Pro, およびnocookieは強制的にiframe
             const forceIframe = ['YoutubeEdu-Kahoot', 'YoutubeEdu-Scratch', 'Youtube-Pro', 'youtube-nocookie'].includes(serverName);
             const isIframe = forceIframe || newUrl.includes('embed');
 
             let playerHtml = '';
             if (isIframe) {
-                playerHtml = \`<iframe id="mainIframe" src="\${newUrl}" frameborder="0" allowfullscreen style="width:100%; height:100%; position:relative; z-index:10;"></iframe>\`;
+                playerHtml = `<iframe id="mainIframe" src="${newUrl}" frameborder="0" allowfullscreen style="width:100%; height:100%; position:relative; z-index:10;"></iframe>`;
             } else {
-                playerHtml = \`<video id="mainPlayer" controls autoplay style="width:100%; height:100%; position:relative; z-index:10; background:#000;"><source src="\${newUrl}" type="video/mp4"></video>\`;
+
+                playerHtml = `<video id="mainPlayer" controls autoplay style="width:100%; height:100%; position:relative; z-index:10; background:#000;"><source src="${newUrl}" type="video/mp4"></video>`;
             }
             playerContainer.innerHTML = playerHtml;
             const newVideo = document.getElementById('mainPlayer');
-            if (newVideo) { newVideo.load(); newVideo.play().catch(e => console.log("Auto")); }
+            if (newVideo) { 
+                newVideo.load(); 
+                setTimeout(() => {
+                    newVideo.play().catch(e => console.log("ブラウザにより自動再生がブロックされました。クリックして再生してください。"));
+                }, 100);
+            }
         } catch (error) { console.error(error); alert('サーバー切り替えに失敗しました。'); } finally { overlay.classList.remove('active'); }
     }
 
     async function loadRecommendations() {
         const params = new URLSearchParams({ title: "${videoData.videoTitle}", channel: "${videoData.channelName}", id: "${videoId}" });
-        const res = await fetch(\`/api/recommendations?\${params.toString()}\`);
+        const res = await fetch(`/api/recommendations?${params.toString()}`);
         const data = await res.json();
         const shorts = data.items.filter(item => item.title.includes('#'));
         const regulars = data.items.filter(item => !item.title.includes('#'));
-        document.getElementById('recommendations').innerHTML = regulars.map(item => \`
-            <a href="/video/\${item.id}" class="rec-item">
-                <div class="rec-thumb"><img src="https://i.ytimg.com/vi/\${item.id}/mqdefault.jpg"></div>
+        document.getElementById('recommendations').innerHTML = regulars.map(item => `
+            <a href="/video/${item.id}" class="rec-item">
+                <div class="rec-thumb"><img src="https://i.ytimg.com/vi/${item.id}/mqdefault.jpg"></div>
                 <div class="rec-info">
-                    <div class="rec-title">\${item.title}</div>
-                    <div class="rec-meta">\${item.channelTitle}</div>
-                    <div class="rec-meta">\${item.viewCountText || ''}</div>
+                    <div class="rec-title">${item.title}</div>
+                    <div class="rec-meta">${item.channelTitle}</div>
+                    <div class="rec-meta">${item.viewCountText || ''}</div>
                 </div>
             </a>
-        \`).join('');
+        `).join('');
         if (shorts.length > 0) {
             const shelf = document.getElementById('shortsShelf');
             const grid = document.getElementById('shortsGrid');
             shelf.style.display = 'block';
-            grid.innerHTML = shorts.slice(0, 4).map(item => \`
-                <a href="/video/\${item.id}" class="short-card">
-                    <div class="short-thumb"><img src="https://i.ytimg.com/vi/\${item.id}/hq720.jpg"></div>
+            grid.innerHTML = shorts.slice(0, 4).map(item => `
+                <a href="/video/${item.id}" class="short-card">
+                    <div class="short-thumb"><img src="https://i.ytimg.com/vi/${item.id}/hq720.jpg"></div>
                     <div class="short-info">
-                        <div class="short-title">\${item.title}</div>
-                        <div class="short-views">\${item.viewCountText || ''}</div>
+                        <div class="short-title">${item.title}</div>
+                        <div class="short-views">${item.viewCountText || ''}</div>
                     </div>
                 </a>
-            \`).join('');
+            `).join('');
         }
     }
+
     window.onload = () => {
         loadRecommendations();
-        const video = document.getElementById('mainPlayer');
-        const iframe = document.getElementById('mainIframe');
-        if (video) { const source = video.querySelector('source'); source.src = source.dataset.src; video.load(); video.play().catch(e => {}); }
-        if (iframe) { iframe.src = iframe.dataset.src; }
+
+        changeServer('googlevideo', '', null);
     };
 </script>
 </body>
