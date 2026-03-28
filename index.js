@@ -193,7 +193,8 @@ app.get("/video/:id", async (req, res, next) => {
 
     for (const apiBase of apiListCache) {
       try {
-        const response = await fetchWithTimeout(`${apiBase}/api/video/${videoId}`, {}, 6000);
+        // タイムアウトを 6000 から 5000 (5秒) に変更
+        const response = await fetchWithTimeout(`${apiBase}/api/video/${videoId}`, {}, 5000);
         if (response.ok) {
           const data = await response.json();
           if (data.stream_url) {
@@ -202,7 +203,24 @@ app.get("/video/:id", async (req, res, next) => {
             break;
           }
         }
-      } catch (e) { continue; }
+        // 取得に失敗した（okでない）場合も代替エンドポイントを試すためにエラーをスロー
+        throw new Error("Fetch failed");
+      } catch (e) {
+        // 5秒経過、または接続エラーが発生した際の代わりとして /rapid/動画ID をfetch
+        try {
+          const rapidRes = await fetchWithTimeout(`/rapid/${videoId}`, {}, 5000);
+          if (rapidRes.ok) {
+            const rapidData = await rapidRes.json();
+            if (rapidData.stream_url) {
+              videoData = rapidData;
+              break; // 取得できたらループを抜ける
+            }
+          }
+        } catch (rapidErr) {
+          // 代替も失敗した場合は次の apiBase へ
+        }
+        continue;
+      }
     }
 
     if (!videoData) {
