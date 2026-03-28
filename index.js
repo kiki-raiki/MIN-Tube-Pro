@@ -537,14 +537,13 @@ app.get('/rapid/:id', async (req, res) => {
       return res.status(400).json({ error: "Failed to fetch video data" });
     }
 
-    // --- チャンネル画像の取得と生成ロジック ---
-    // 1. レスポンス内にあるか確認 (APIの仕様により channelThumbnail や author.thumbnails など)
+    // --- 多分取得できないから消してもいい ---
     let channelImageUrl = data.channelThumbnail?.[0]?.url || data.author?.thumbnails?.[0]?.url;
 
-    // 2. もし取得できなかった場合、チャンネル名からアバター画像を「生成」するURLを作成
+    // 2. アバターURLを作成
     if (!channelImageUrl) {
       const name = encodeURIComponent(data.channelTitle || 'Youtube Channel');
-      // UI Avatars を使用して、背景色付きの頭文字アイコンを生成
+      // UI Avatars を使用
       channelImageUrl = `https://ui-avatars.com/api/?name=${name}&background=random&color=fff&size=128`;
     }
 
