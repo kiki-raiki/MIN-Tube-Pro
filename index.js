@@ -654,16 +654,12 @@ app.get('/pro-stream/:videoId', (req, res) => {
 <style>
   :root{--bg:#000814;--accent:#00e5ff;--muted:#9fb6c8}
   html,body{height:100%;margin:0;background:radial-gradient(ellipse at center, rgba(0,8,20,1) 0%, rgba(0,4,10,1) 70%);font-family:Inter,system-ui,Roboto,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:#e6f7ff}
-  /* 全画面フレーム */
   .stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
-  .frame{position:relative;width:100%;height:100%;background:#000;border-radius:0;overflow:hidden}
-  /* レイヤー（重ねる iframe） */
+  .frame{position:relative;width:100%;height:100%;background:#000;overflow:hidden}
   .layer{position:absolute;inset:0;transition:opacity .8s cubic-bezier(.2,.9,.2,1), transform .8s;display:flex;align-items:center;justify-content:center}
   .layer iframe{width:100%;height:100%;border:0;display:block}
-  .layer.hidden{display:none}
   .layer.inactive{opacity:0;transform:scale(1.02);pointer-events:none}
   .layer.active{opacity:1;transform:scale(1);pointer-events:auto}
-  /* 没入用 HUD（ローディングのみ表示） */
   .hud{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:80;display:flex;flex-direction:column;align-items:center;gap:14px;backdrop-filter:blur(6px)}
   .card{min-width:360px;max-width:88vw;padding:18px 20px;border-radius:14px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.35));box-shadow:0 10px 40px rgba(0,0,0,0.6);color:#dff9ff}
   .title{font-size:18px;font-weight:700;color:var(--accent);letter-spacing:0.6px}
@@ -675,35 +671,26 @@ app.get('/pro-stream/:videoId', (req, res) => {
   .stream-item.fail{opacity:0.6;border-left:4px solid #ff6b6b}
   .progress{height:6px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;margin-top:10px}
   .bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#2ee6a7)}
-  /* 小さなコントロール（画面右下） */
   .mini-controls{position:absolute;right:18px;bottom:18px;z-index:90;display:flex;gap:8px}
   .btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);color:#dff9ff;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
   .btn.primary{background:linear-gradient(90deg,var(--accent),#2ee6a7);color:#001}
-  /* フルスクリーン時の微調整 */
-  @media (max-width:720px){
-    .card{min-width:300px;padding:14px}
-    .title{font-size:16px}
-  }
+  @media (max-width:720px){.card{min-width:300px;padding:14px}.title{font-size:16px}}
 </style>
 </head>
 <body>
 <div class="stage">
   <div class="frame" id="frame"></div>
 
-  <!-- 没入型ローディング HUD -->
   <div class="hud" id="hud">
     <div class="card" id="card">
       <div class="title">Pro Stream — 読み込み中</div>
       <div class="status" id="status">初期化しています…</div>
       <div class="sub" id="sub">エンドポイントへ接続中</div>
-
       <div class="progress" aria-hidden="true"><div class="bar" id="progressBar"></div></div>
-
       <div class="streams" id="streamsList" aria-live="polite"></div>
     </div>
   </div>
 
-  <!-- 小さなコントロール（ユーザーが任意で操作可能） -->
   <div class="mini-controls" id="miniControls" style="display:none">
     <button class="btn" id="toggleMute">ミュート切替</button>
     <button class="btn primary" id="enterImmersive">没入モード</button>
@@ -711,16 +698,13 @@ app.get('/pro-stream/:videoId', (req, res) => {
 </div>
 
 <script>
-/* ===== 設定 ===== */
 const VIDEO_ID = ${JSON.stringify(videoId)};
 const ENDPOINTS = [
-  {name:'/360', path:'/360/' + VIDEO_ID},
   {name:'/scratch-edu', path:'/scratch-edu/' + VIDEO_ID},
   {name:'/kahoot-edu', path:'/kahoot-edu/' + VIDEO_ID},
   {name:'/nocookie', path:'/nocookie/' + VIDEO_ID}
 ];
-const PLAYABLE_TIMEOUT = 9000; // ms
-/* ================ */
+const PLAYABLE_TIMEOUT = 9000;
 
 const frame = document.getElementById('frame');
 const hud = document.getElementById('hud');
@@ -732,21 +716,12 @@ const miniControls = document.getElementById('miniControls');
 const toggleMuteBtn = document.getElementById('toggleMute');
 const enterImmersiveBtn = document.getElementById('enterImmersive');
 
-let layers = []; // {name,url,el,iframe,state,ok}
+let layers = [];
+let activeIndex = 0;
 let globalMuted = true;
 
-/* ステータス更新 */
-function setStatus(main, sub){
-  statusEl.textContent = main;
-  subEl.textContent = sub || '';
-}
-
-/* プログレス更新（0〜1） */
-function setProgress(p){
-  progressBar.style.width = Math.max(0, Math.min(1,p)) * 100 + '%';
-}
-
-/* ストリーム行を追加/更新 */
+function setStatus(main, sub){ statusEl.textContent = main; subEl.textContent = sub || ''; }
+function setProgress(p){ progressBar.style.width = Math.max(0, Math.min(1,p)) * 100 + '%'; }
 function upsertStreamRow(name, url, state, note){
   let el = document.querySelector('[data-stream="'+name+'"]');
   if(!el){
@@ -761,9 +736,8 @@ function upsertStreamRow(name, url, state, note){
   el.classList.toggle('fail', state !== 'ok');
 }
 
-/* 1) 各エンドポイントから埋め込み URL を取得 */
 async function fetchAllUrls(){
-  setStatus('エンドポイントに接続中', '動画URLを取得しています');
+  setStatus('URL取得中', '各エンドポイントに問い合わせています');
   const results = [];
   for(let i=0;i<ENDPOINTS.length;i++){
     const ep = ENDPOINTS[i];
@@ -783,12 +757,11 @@ async function fetchAllUrls(){
       results.push({name:ep.name, url:null, ok:false});
       upsertStreamRow(ep.name, '', 'fail', err.message || '取得失敗');
     }
-    setProgress((i+1)/ENDPOINTS.length * 0.4); // 40% を URL 取得に割当
+    setProgress((i+1)/ENDPOINTS.length * 0.4);
   }
   return results;
 }
 
-/* 2) レイヤー作成（iframe を重ねる） */
 function createLayer(name, url, idx){
   const layer = document.createElement('div');
   layer.className = 'layer inactive';
@@ -803,7 +776,6 @@ function createLayer(name, url, idx){
   return {name, url, el:layer, iframe, state:'init', ok:false};
 }
 
-/* 3) iframe のロード確認（汎用） */
 function initGenericIframe(layerObj){
   return new Promise((resolve) => {
     const iframe = layerObj.iframe;
@@ -827,7 +799,6 @@ function initGenericIframe(layerObj){
   });
 }
 
-/* 4) 全レイヤー初期化と自動再生試行（ミュート） */
 async function initLayers(results){
   setStatus('埋め込みを初期化中', 'プレイヤーを生成しています');
   const valid = results.filter(r => r.ok && r.url);
@@ -836,98 +807,66 @@ async function initLayers(results){
     setProgress(1);
     return;
   }
-
-  // 作成
   for(let i=0;i<valid.length;i++){
     const r = valid[i];
     const obj = createLayer(r.name, r.url, i);
     layers.push(obj);
     upsertStreamRow(r.name, r.url, 'pending', '埋め込み生成');
-    setProgress(0.4 + (i+1)/valid.length * 0.4); // 次の 40% を埋め込み生成に割当
+    setProgress(0.4 + (i+1)/valid.length * 0.4);
   }
-
-  setStatus('再生確認中', '各埋め込みのロードと自動再生を確認しています');
-  // 並列でロード確認
+  setStatus('再生確認中', '各埋め込みのロードを確認しています');
   const checks = await Promise.all(layers.map(l => initGenericIframe(l)));
-  // 成功したものだけ残す
-  layers = layers.filter((l, i) => checks[i] && checks[i].ok);
-  layers.forEach((l,i) => {
-    upsertStreamRow(l.name, l.url, 'ok', 'ロード完了');
-  });
-
+  layers = layers.filter((l,i) => checks[i] && checks[i].ok);
+  layers.forEach(l => upsertStreamRow(l.name, l.url, 'ok', 'ロード完了'));
   if(layers.length === 0){
     setStatus('全ての埋め込みが失敗しました', '別の動画IDをお試しください');
     setProgress(1);
     return;
   }
-
-  // 最初のレイヤーを active にして自動再生（ミュート）を試みる
   activeIndex = 0;
   updateLayerVisibility();
   setProgress(0.85);
   setStatus('自動再生を試行中', 'ミュートで再生を開始します');
-
-  // ミュートでの自動再生を試みる（iframe が YouTube 系なら enablejsapi を使うのが望ましいが、ここでは汎用的にフォーカスを与える）
-  layers.forEach(l => {
-    try{
-      // ブラウザが許す場合、iframe にフォーカスを与えることで自動再生の成功率を上げる
-      l.iframe.focus();
-    }catch(e){}
-  });
-
-  // 少し待ってから HUD をフェードアウト
+  layers.forEach(l => { try{ l.iframe.focus(); }catch(e){} });
   setTimeout(()=> {
     setProgress(1);
     setStatus('没入準備完了', '画面をタップすると音声再生が可能になる場合があります');
-    // HUD をゆっくりフェードアウト（CSS ではなく JS で非表示）
     hud.style.transition = 'opacity .8s ease';
     hud.style.opacity = '0';
     setTimeout(()=> { hud.style.display = 'none'; miniControls.style.display = 'flex'; }, 900);
   }, 900);
 }
 
-/* レイヤー表示更新 */
-let activeIndex = 0;
 function updateLayerVisibility(){
   layers.forEach((l,i) => {
-    if(i === activeIndex){
-      l.el.classList.remove('inactive'); l.el.classList.add('active');
-    } else {
-      l.el.classList.remove('active'); l.el.classList.add('inactive');
-    }
+    if(i === activeIndex){ l.el.classList.remove('inactive'); l.el.classList.add('active'); }
+    else { l.el.classList.remove('active'); l.el.classList.add('inactive'); }
   });
 }
 
-/* 次のレイヤーへ（自動切替やフェード） */
 function showNext(){
   if(layers.length <= 1) return;
   activeIndex = (activeIndex + 1) % layers.length;
   updateLayerVisibility();
 }
 
-/* ミュート切替（可能な範囲で postMessage を送る） */
 function toggleMute(){
   globalMuted = !globalMuted;
   toggleMuteBtn.textContent = globalMuted ? 'ミュート中' : 'ミュート解除';
-  // iframe に postMessage で unMute/mute を送る（YouTube などが受け取れば反映）
   layers.forEach(l => {
-    try{
-      l.iframe.contentWindow.postMessage(JSON.stringify({event:'command',func: globalMuted ? 'mute' : 'unMute', args:[]}), '*');
-    }catch(e){}
+    try{ l.iframe.contentWindow.postMessage(JSON.stringify({event:'command',func: globalMuted ? 'mute' : 'unMute', args:[]}), '*'); }catch(e){}
   });
 }
 
-/* フルスクリーン（没入モード） */
 function enterImmersive(){
   const el = document.documentElement;
   if(el.requestFullscreen) el.requestFullscreen();
   else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 }
 
-/* 初期フロー */
 (async function main(){
   try{
-    setStatus('初期化中', 'エンドポイント一覧を問い合わせます');
+    setStatus('初期化中', 'エンドポイントを問い合わせています');
     const results = await fetchAllUrls();
     setStatus('URL取得完了', '埋め込みを初期化します');
     await initLayers(results);
@@ -937,19 +876,15 @@ function enterImmersive(){
   }
 })();
 
-/* イベント */
 toggleMuteBtn.addEventListener('click', toggleMute);
 enterImmersiveBtn.addEventListener('click', enterImmersive);
 
-// タップで HUD を閉じる（ユーザー操作として再生許可が出る場合に備える）
 frame.addEventListener('click', ()=> {
   if(hud.style.display !== 'none'){
     hud.style.display = 'none';
     miniControls.style.display = 'flex';
-    // ユーザー操作として iframe にフォーカス
     layers.forEach(l => { try{ l.iframe.focus(); }catch(e){} });
   } else {
-    // 画面タップで次のレイヤーへ（軽い自動切替）
     showNext();
   }
 });
@@ -957,6 +892,7 @@ frame.addEventListener('click', ()=> {
 </body>
 </html>`);
 });
+
 
 app.use((req, res) => res.status(404).sendFile(path.join(__dirname, "public", "error.html")));
 app.use((err, req, res, next) => {
