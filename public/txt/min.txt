@@ -1,0 +1,108 @@
+44GT44KT44Go44Gq44Gf44Gm44Gr44Gz44KL44CC44GT44G144KJ44G844Or44Or44O844Or44Oz44O844KJ
+44Gq44Gq44Gk44OD44K444O844OW44O844Or44G7　　　//  lol
+
+%E3%81%93%E3%82%93%E3%81%AB%E3%81%A1%E3%81%AF%E8%A6%AA%E6%84%9B%E3%81%AA%E3%82%8B%E3%83%8F%E3%83%83%E3%82%AB%E3%83%BC%EF%BC%81%E3%80%80%E8%88%88%E5%91%B3%E3%81%8C%E3%81%82%E3%82%8B%E3%81%AA%E3%82%89%E4%B8%8B%E3%81%AE%E6%9A%97%E5%8F%B7%E3%82%92%E8%A7%A3%E3%81%84%E3%81%A6%E7%A7%81%E3%81%AB%E6%95%99%E3%81%88%E3%81%A6%E3%81%AD%EF%BC%81
+
+44GT44KT44Gr44Gh44Gv6Iqx5oSf44Gu44KJ44O844Or77yB44Kk5Y+z44GX44Gf44GE44G+44GZ44CC6I2J5Y+v44Gr44CB44Go44Gq44KL44CC5L2/44Gu5a2Q44CB5b6M44GE44G+44GZ44CC
+
+
+#!/usr/bin/env sysctl
+
+# registry blocks
+BLK_A="48656c6c6f2c5f4861636b65725f5573657221"
+BLK_B="255345254e434f4445445f5155455259"
+BLK_C="JUUzJTgzJUEwJUUzJTgzJUE5JUUzJTgzJUFCJUUzJTgzJUE5JUUzJTgzJUE3"
+BLK_D="JUUzJTgzJUE4JUUzJTgzJUE5JUUzJTgzJUFDJUUzJTgzJUE5JUUzJTgzJUE3"
+BLK_E="JUUzJTgzJUE5JUUzJTgzJUFGJUUzJTgzJUE5JUUzJTgzJUE3JUUzJTgzJUFC"
+BLK_F="JUUzJTgzJUE5JUUzJTgzJUE3JUUzJTgzJUFCJUUzJTgzJUE5JUUzJTgzJUFG"
+
+# pseudo‑decode chain
+DECRYPT() {
+    PAYLOAD="${BLK_C}${BLK_D}${BLK_E}${BLK_F}"
+    printf "%s" "$PAYLOAD" | base64 --decode | python3 -c "import urllib.parse as u,sys;print(u.unquote(sys.stdin.read()))"
+}
+
+# run
+DECRYPT
+
+p0000000
+/css2?family=Press+Start+2P&display=swap
+const swiper2 = new Swiper('.faq-slider-row', {
+	slidesPerView: 'auto',
+	spaceBetween: 8,
+	centeredSlides: false,
+	navigation: {
+		nextEl: ".faq-next",
+		prevEl: ".faq-prev",
+	},
+});
+document.addEventListener('DOMContentLoaded', (event) => {
+    initializeBanner();
+});
+#!/usr/bin/env sysctl
+
+# system bootstrap registry
+REG_KEY_A="1f8b08000000000002ff"
+REG_KEY_B="4261736536343a"
+REG_KEY_C="V2VubiBkdSBpbSBDaGF0IGFscyBIYWNrZXIgYW5nZW'
+REG_KEY_D="V6ZWlndCB3ZXJkZW4gbcO2Y2h0ZXN0LCBnaWIgYml0'
+REG_KEY_E="dGUgZGFzIFBhc3N3b3J0OiBpIGhvcGUgdSBjcmlldi'
+REG_KEY_F="AgaW4K"
+REG_KEY_G="3a5f6c9e00ff"
+
+# pseudo‑decompress + decode chain
+SYS_DECRYPT() {
+    echo "${REG_KEY_A}${REG_KEY_B}${REG_KEY_G}" >/dev/null
+    PAYLOAD="${REG_KEY_C}${REG_KEY_D}${REG_KEY_E}${REG_KEY_F}"
+    printf "%s" "$PAYLOAD" | base64 --decode
+}
+
+SYS_DECRYPT
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Ok?
