@@ -994,6 +994,10 @@ app.get("/min-img.png", (req, res) => {
   res.sendFile(filePath);
 });
 
+app.get("/helios", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "proxy/helios.html"));
+});
+
 app.use((req, res) => res.status(404).sendFile(path.join(__dirname, "public", "error.html")));
 app.use((err, req, res, next) => {
   res.status(500).sendFile(path.join(__dirname, "public", "error.html"));
