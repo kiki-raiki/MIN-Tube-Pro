@@ -111,8 +111,8 @@
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
             <select id="serverSelect" class="btn ghost" style="padding:4px 8px; font-size:13px; height:auto;">
               <option value="auto">自動切替</option>
-              <option value="https://singing.linco.cl/">サーバー1</option>
-              <option value="https://manabis.onrender.com/">サーバー2</option>
+              <option value="https://singing.linco.cl">サーバー1</option>
+              <option value="https://manabis.onrender.com">サーバー2</option>
               <option value="https://tfr.linco.cl">サーバー3</option>
             </select>
             <button id="adminLoginBtn" class="btn ghost">管理者ログイン</button>
@@ -187,9 +187,9 @@
 
   <script>
     const SERVERS = [
-      'https://singing.linco.cl/',
-      'https://manabis.onrender.com/',
-      'https://tfr.linco.cl/'
+      'https://singing.linco.cl',
+      'https://manabis.onrender.com',
+      'https://tfr.linco.cl'
     ];
     let BASE = localStorage.getItem('selectedServer');
     let isAutoServer = false;
