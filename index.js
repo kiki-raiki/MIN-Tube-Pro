@@ -1014,6 +1014,39 @@ app.get("/labo5", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "app/html-tube.html"));
 });
 
+app.get("/ai", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "app/ai.html"));
+});
+
+app.get("/dl-pro", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "app/sorry.html"));
+});
+
+app.get("/update", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "app/sorry.html"));
+});
+
+app.get("/blog", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "app/sorry.html"));
+});
+
+app.get("/game", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "app/sorry.html"));
+});
+
+app.get("/movie", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "app/sorry.html"));
+});
+
+app.get("/check", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "app/check.html"));
+});
+
+app.get("/use-api", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "app/sorry.html"));
+});
+
+
 app.use((req, res) => res.status(404).sendFile(path.join(__dirname, "public", "error.html")));
 app.use((err, req, res, next) => {
   res.status(500).sendFile(path.join(__dirname, "public", "error.html"));
