@@ -111,6 +111,7 @@
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
             <button id="adminLoginBtn" class="btn ghost">管理者ログイン</button>
             <button id="adminModalBtn" class="btn" style="display:none">管理モーダルを表示</button>
+            <label id="banToggleLabel" style="display:none;font-size:13px;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="banToggle"> BANボタンを表示</label>
           </div>
         </div>
         <textarea id="messageInput" placeholder="コメントを入力（Shift+Enterで改行、Enterで送信）" maxlength="200"></textarea>
@@ -195,6 +196,8 @@
     const toggleOthelloBtn = document.getElementById('toggleOthello');
     const adminLoginBtn = document.getElementById('adminLoginBtn');
     const adminModalBtn = document.getElementById('adminModalBtn');
+    const banToggleLabel = document.getElementById('banToggleLabel');
+    const banToggle = document.getElementById('banToggle');
 
     const othelloPanel = document.getElementById('othelloPanel');
     const roomsList = document.getElementById('roomsList');
@@ -292,6 +295,21 @@
         const badge = document.createElement('span'); badge.className = 'admin-badge'; badge.textContent = '管理者';
         name.appendChild(badge);
       }
+
+      // BAN button (Visible if toggle is checked and user is not system or admin)
+      if(banToggle && banToggle.checked && m.username !== 'システム' && !adminList.includes(m.username)){
+        const banBtn = document.createElement('button');
+        banBtn.textContent = 'BAN';
+        banBtn.style.cssText = 'margin-left:8px; padding:2px 6px; background:#dc3545; color:#fff; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;';
+        banBtn.onclick = (e) => {
+          e.stopPropagation();
+          if(confirm(`ユーザー「${m.username || '匿名'}」をBANしますか？`)){
+            socket.emit('banUser', { username: m.username, seed: m.seed });
+          }
+        };
+        name.appendChild(banBtn);
+      }
+
       const time = document.createElement('div'); time.className = 'time'; time.textContent = formatTime(m.time);
       meta.appendChild(name); meta.appendChild(time);
 
@@ -379,6 +397,7 @@
           adminRedirectUrl = data.url || null;
           alert('管理者ログインに成功しました。管理ボタンが表示されます。');
           adminModalBtn.style.display = adminRedirectUrl ? 'inline-block' : 'inline-block';
+          banToggleLabel.style.display = 'flex';
           const r = await fetch(BASE + '/api/admins');
           if(r.ok) adminList = await r.json();
           chatColumn.querySelectorAll('.message, .system-note').forEach(n => n.remove());
@@ -392,8 +411,23 @@
     adminLoginBtn.addEventListener('click', adminLoginFlow);
     adminModalBtn.addEventListener('click', () => { if(adminRedirectUrl) window.open(adminRedirectUrl, '_blank'); });
 
+    banToggle.addEventListener('change', () => {
+      chatColumn.querySelectorAll('.message, .system-note').forEach(n => n.remove());
+      messages.forEach(m => appendMessageElement(m));
+    });
+
     /* Socket handlers */
     socket.on('connect', () => {});
+    
+    socket.on('banned', (data) => {
+      const myUsername = usernameInput.value.trim() || '匿名';
+      const mySeed = seedInput.value.trim() || '';
+      if (data.username === myUsername && data.seed === mySeed) {
+        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;font-size:24px;font-weight:bold;background:var(--bg);color:var(--text);">あなたはチャットから退出させられました。</div>';
+        socket.disconnect();
+      }
+    });
+
     socket.on('newMessage', (msg) => {
       messages.push(msg);
       appendMessageElement(msg);
