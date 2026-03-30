@@ -109,6 +109,12 @@
           <input id="seed" type="text" placeholder="seed（任意）" />
           <button id="toggleOthello" class="btn" style="flex:0 0 auto">オセロ</button>
           <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <select id="serverSelect" class="btn ghost" style="padding:4px 8px; font-size:13px; height:auto;">
+              <option value="auto">自動切替</option>
+              <option value="https://studying-tt.onrender.com">サーバー1</option>
+              <option value="https://study.linco.cl">サーバー2</option>
+              <option value="https://webserverakk.net">サーバー3</option>
+            </select>
             <button id="adminLoginBtn" class="btn ghost">管理者ログイン</button>
             <button id="adminModalBtn" class="btn" style="display:none">管理モーダルを表示</button>
             <label id="banToggleLabel" style="display:none;font-size:13px;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="banToggle"> BANボタンを表示</label>
@@ -180,8 +186,43 @@
   <div id="overlay" class="overlay" style="display:none"></div>
 
   <script>
-    const BASE = 'https://studying-tt.onrender.com';
+    const SERVERS = [
+      'https://studying-tt.onrender.com',
+      'https://study.linco.cl',
+      'https://webserverakk.net'
+    ];
+    let BASE = localStorage.getItem('selectedServer');
+    let isAutoServer = false;
+    if (!BASE || BASE === 'auto') {
+      BASE = SERVERS[0];
+      isAutoServer = true;
+    }
+
     const socket = io(BASE, { transports: ['websocket','polling'] });
+
+    if (isAutoServer) {
+      (async () => {
+        for (const s of SERVERS) {
+          try {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), 2000);
+            const res = await fetch(s + '/api/messages', { signal: controller.signal });
+            clearTimeout(id);
+            if (res.ok) {
+              if (BASE !== s) {
+                BASE = s;
+                socket.io.uri = s;
+                socket.disconnect().connect();
+                loadMessages();
+                fetchRooms();
+                fetch(BASE + '/api/admins').then(r=>r.json()).then(d=>adminList=d).catch(()=>{});
+              }
+              break;
+            }
+          } catch(e) {}
+        }
+      })();
+    }
 
     /* Elements */
     const composerFixed = document.getElementById('composerFixed');
@@ -198,6 +239,7 @@
     const adminModalBtn = document.getElementById('adminModalBtn');
     const banToggleLabel = document.getElementById('banToggleLabel');
     const banToggle = document.getElementById('banToggle');
+    const serverSelect = document.getElementById('serverSelect');
 
     const othelloPanel = document.getElementById('othelloPanel');
     const roomsList = document.getElementById('roomsList');
@@ -222,6 +264,21 @@
     let myColor = null;
     let adminList = [];
     let adminRedirectUrl = null;
+
+    /* Server Select Logic */
+    if (localStorage.getItem('selectedServer')) {
+      serverSelect.value = localStorage.getItem('selectedServer');
+    } else {
+      serverSelect.value = 'auto';
+    }
+    serverSelect.addEventListener('change', (e) => {
+      if (e.target.value === 'auto') {
+        localStorage.removeItem('selectedServer');
+      } else {
+        localStorage.setItem('selectedServer', e.target.value);
+      }
+      location.reload();
+    });
 
     /* Utilities */
     function avatarText(name){ if(!name) return 'U'; return name.trim().slice(0,2).toUpperCase(); }
