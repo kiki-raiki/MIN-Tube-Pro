@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MIN-Tube-Pro — Home</title>
+<style>
+  :root{
+    --bg1:#0f1724;
+    --bg2:#071029;
+    --accent:#00d4ff;
+    --glass: rgba(255,255,255,0.06);
+    --card: rgba(255,255,255,0.03);
+    --glass-border: rgba(255,255,255,0.08);
+    --radius:14px;
+    --glass-blur:10px;
+    --text:#e6f7ff;
+    --muted:#9fb7c9;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter, "Noto Sans JP", system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text);-webkit-font-smoothing:antialiased}
+  .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 20px;gap:28px}
+  .hero{
+    width:100%;max-width:1100px;display:flex;align-items:center;justify-content:space-between;gap:20px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:var(--radius);padding:22px;border:1px solid var(--glass-border);backdrop-filter: blur(var(--glass-blur));
+    box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+  }
+  .hero-left{display:flex;flex-direction:column;gap:8px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo-img{width:64px;height:64px;border-radius:12px;object-fit:cover;box-shadow:0 6px 18px rgba(0,0,0,0.5);background:linear-gradient(135deg,#00d4ff,#6a00ff)}
+  .title{font-size:20px;font-weight:700;letter-spacing:0.2px}
+  .subtitle{color:var(--muted);font-size:13px}
+  .welcome{margin-top:6px;font-size:18px;font-weight:600;color:var(--accent);display:flex;align-items:center;gap:12px}
+  .welcome .spark{width:10px;height:10px;border-radius:50%;background:linear-gradient(90deg,#fff,#00d4ff);box-shadow:0 0 18px #00d4ff;animation: pulse 2s infinite}
+  @keyframes pulse{0%{transform:scale(0.9);opacity:0.8}50%{transform:scale(1.2);opacity:1}100%{transform:scale(0.9);opacity:0.8}}
+  .typewriter{font-family:monospace;background:linear-gradient(90deg,var(--accent),#9bfffe);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero-right{position:relative;width:220px;height:80px;display:flex;align-items:center;justify-content:center}
+  .orb{position:absolute;border-radius:50%;filter:blur(28px);opacity:0.18}
+  .orb.a{width:160px;height:160px;background:linear-gradient(90deg,#00d4ff,#6a00ff);left:-20px;top:-40px;animation: floatA 8s ease-in-out infinite}
+  .orb.b{width:120px;height:120px;background:linear-gradient(90deg,#ff7ab6,#ffd36a);right:-10px;bottom:-20px;animation: floatB 10s ease-in-out infinite}
+  @keyframes floatA{0%{transform:translateY(0)}50%{transform:translateY(-12px)}100%{transform:translateY(0)}}
+  @keyframes floatB{0%{transform:translateY(0)}50%{transform:translateY(10px)}100%{transform:translateY(0)}}
+
+  .grid{width:100%;max-width:1100px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+  .card{
+    background:var(--card);border-radius:12px;padding:16px;border:1px solid var(--glass-border);cursor:pointer;transition:transform .18s ease, box-shadow .18s ease;
+    display:flex;flex-direction:column;gap:10px;min-height:120px;
+  }
+  .card:hover{transform:translateY(-8px);box-shadow:0 18px 40px rgba(2,6,23,0.6)}
+  .card .row{display:flex;align-items:center;gap:12px}
+  .icon{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:inset 0 -6px 18px rgba(0,0,0,0.25)}
+  .app-title{font-weight:700;font-size:15px}
+  .app-desc{color:var(--muted);font-size:13px;line-height:1.35}
+  .endpoint{font-family:monospace;font-size:12px;color:#bfefff;background:rgba(0,0,0,0.12);padding:6px 8px;border-radius:8px;display:inline-block}
+  .badge{margin-left:auto;font-size:12px;color:var(--muted)}
+  .footer{max-width:1100px;color:var(--muted);font-size:13px;text-align:center;padding:8px 12px;border-radius:10px}
+  @media (max-width:640px){
+    .hero{flex-direction:column;align-items:flex-start}
+    .hero-right{width:100%;height:60px}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <header class="hero" aria-labelledby="hero-title">
+      <div class="hero-left">
+        <div class="brand">
+          <img src="img/min-tube-pro.png" alt="MIN-Tube-Pro ロゴ" class="logo-img" />
+          <div>
+            <div id="hero-title" class="title">MIN‑Tube‑Pro</div>
+            <div class="subtitle">アプリランチャー — すばやく、快適に</div>
+          </div>
+        </div>
+
+        <div class="welcome" aria-live="polite">
+          <div class="spark" aria-hidden="true"></div>
+          <div class="typewriter" id="welcomeText" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="hero-right" aria-hidden="true">
+        <div class="orb a"></div>
+        <div class="orb b"></div>
+      </div>
+    </header>
+
+    <section class="grid" aria-label="アプリ一覧">
+      <article class="card" role="button" tabindex="0" data-endpoint="/" aria-label="Youtube-Pro — 動画視聴">
+        <div class="row">
+          <div class="icon">▶️</div>
+          <div>
+            <div class="app-title">Youtube‑Pro</div>
+            <div class="app-desc">Youtube‑ProはMIN‑Tube2の進化系。UIとサーバ処理が改善され、動画を快適に視聴できます。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="endpoint">/</div>
+          <div class="badge">動画プレイヤー</div>
+        </div>
+      </article>
+
+      <article class="card" role="button" tabindex="0" data-endpoint="/chat" aria-label="Mino-Chat — チャットとゲーム">
+        <div class="row">
+          <div class="icon">💬</div>
+          <div>
+            <div class="app-title">Mino‑Chat</div>
+            <div class="app-desc">世界中の人とチャットやゲームを楽しめます。ぜひ参加してください！</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="endpoint">/chat</div>
+          <div class="badge">コミュニティ</div>
+        </div>
+      </article>
+
+      <article class="card" role="button" tabindex="0" data-endpoint="/dl-pro" aria-label="DL-PRO — 動画ダウンロード">
+        <div class="row">
+          <div class="icon">⬇️</div>
+          <div>
+            <div class="app-title">DL‑PRO</div>
+            <div class="app-desc">TikTok・YouTubeの動画を素早くダウンロード。invidiousは使用しません。Youtube‑Pro互換。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="endpoint">/dl-pro</div>
+          <div class="badge">ダウンロード</div>
+        </div>
+      </article>
+
+      <article class="card" role="button" tabindex="0" data-endpoint="/nautilus-os" aria-label="NautilusOS — HTML5プロキシ">
+        <div class="row">
+          <div class="icon">🧭</div>
+          <div>
+            <div class="app-title">NautilusOS</div>
+            <div class="app-desc">最高のHTML5プロキシ。アカウントを作成して使ってみましょう！</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="endpoint">/nautilus-os</div>
+          <div class="badge">プロキシ</div>
+        </div>
+      </article>
+
+      <article class="card" role="button" tabindex="0" data-endpoint="/helios" aria-label="Helios — タブ付きHTMLプロキシ">
+        <div class="row">
+          <div class="icon">☀️</div>
+          <div>
+            <div class="app-title">Helios</div>
+            <div class="app-desc">タブ付きのHTMLプロキシ。NautilusOSと互換性があります。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="endpoint">/helios</div>
+          <div class="badge">プロキシ</div>
+        </div>
+      </article>
+
+      <article class="card" role="button" tabindex="0" data-endpoint="/update" aria-label="Labo5 — バージョン情報とアップデート">
+        <div class="row">
+          <div class="icon">🔧</div>
+          <div>
+            <div class="app-title">Labo5 v1.0.1</div>
+            <div class="app-desc">完全フリーオープンソース。MIN‑Tube‑Proのバージョン確認と最新版インストール。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="endpoint">/update</div>
+          <div class="badge">アップデート</div>
+        </div>
+      </article>
+
+      <article class="card" role="button" tabindex="0" data-endpoint="/unblockers" aria-label="Unblockers — ブロックされていないプロキシ">
+        <div class="row">
+          <div class="icon">🔓</div>
+          <div>
+            <div class="app-title">Unblockers</div>
+            <div class="app-desc">ブロックされていないプロキシを取得して提供します。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="endpoint">/unblockers</div>
+          <div class="badge">プロキシ</div>
+        </div>
+      </article>
+
+      <article class="card" role="button" tabindex="0" data-endpoint="/game" aria-label="Games — ゲーム">
+        <div class="row">
+          <div class="icon">🎮</div>
+          <div>
+            <div class="app-title">Games</div>
+            <div class="app-desc">たくさんのゲームをプレイしましょう！気軽に遊べます。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="endpoint">/game</div>
+          <div class="badge">エンタメ</div>
+        </div>
+      </article>
+    </section>
+
+    <div class="footer" role="contentinfo">クリックまたはEnterでアプリを開きます。エンドポイントは必要に応じて変更してください。</div>
+  </div>
+
+<script>
+  const welcomePhrases = [
+    "Welcome to MIN‑Tube‑Pro ✨",
+    "動画をもっと快適に。🎬",
+    "チャット・ダウンロード・プロキシを一括管理。🌐"
+  ];
+  const el = document.getElementById('welcomeText');
+  let pi = 0, ci = 0, forward = true;
+  const typingDelay = 90;
+  const deletingDelay = 60;
+  const pauseBetweenPhrases = 2200;
+
+  function tick(){
+    const phrase = welcomePhrases[pi];
+    if(forward){
+      ci++;
+      el.textContent = phrase.slice(0,ci);
+      if(ci === phrase.length){ forward=false; setTimeout(tick, pauseBetweenPhrases); return; }
+      setTimeout(tick, typingDelay);
+    } else {
+      ci--;
+      el.textContent = phrase.slice(0,ci);
+      if(ci === 0){ forward=true; pi=(pi+1)%welcomePhrases.length; setTimeout(tick, 500); return; }
+      setTimeout(tick, deletingDelay);
+    }
+  }
+
+  document.querySelectorAll('.card').forEach(card=>{
+    const endpoint = card.dataset.endpoint || '/';
+    function openEndpoint(){
+      window.location.href = endpoint;
+    }
+    card.addEventListener('click', openEndpoint);
+    card.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openEndpoint(); }
+    });
+  });
+
+  const firstCard = document.querySelector('.card');
+  if(firstCard) firstCard.setAttribute('aria-pressed','false');
+</script>
+</body>
+</html>
