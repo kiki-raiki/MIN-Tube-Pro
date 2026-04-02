@@ -1081,28 +1081,19 @@ app.get('/ai-fetch/:videoId', async (req, res) => {
         const videoViews = viewsMatch ? parseInt(viewsMatch[1]) : 0;
         const likeCount = likesMatch ? parseInt(likesMatch[1]) : 0;
 
-        let videoTitle = videoId; 
+        let videoTitle = videoId;
         let channelName = videoId;
-        
+        let channelId = "";
+
         try {
-            let page = 0;
-            let found = false;
-            while (page < 10 && !found) {
-                const searchResults = await yts.GetListByKeyword(videoId, false, 20, page);
-                if (searchResults && searchResults.items && searchResults.items.length > 0) {
-                    const matchedVideo = searchResults.items.find(item => item.id === videoId);
-                    if (matchedVideo) {
-                        videoTitle = matchedVideo.title || videoId;
-                        channelName = (matchedVideo.author && matchedVideo.author.name) ? matchedVideo.author.name : videoId;
-                        found = true;
-                    }
-                } else {
-                    break;
-                }
-                page++;
+            const videoDetails = await youtubesearchapi.GetVideoDetails(videoId);
+            if (videoDetails) {
+                videoTitle = videoDetails.title || videoId;
+                channelName = videoDetails.channel || videoId;
+                channelId = videoDetails.channelId || "";
             }
-        } catch (searchErr) {
-            console.error("Search API Error:", searchErr);
+        } catch (apiErr) {
+            console.error("youtubesearchapi Error:", apiErr);
         }
 
         const protocol = req[_0x42f1('0x6')];
@@ -1130,7 +1121,7 @@ app.get('/ai-fetch/:videoId', async (req, res) => {
             highstreamUrl: finalStreamUrl,
             audioUrl: finalStreamUrl,
             videoId: videoId,
-            channelId: "", 
+            channelId: channelId, 
             channelName: channelName, 
             channelImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(channelName)}&background=random&color=fff&size=128`,
             videoTitle: videoTitle, 
