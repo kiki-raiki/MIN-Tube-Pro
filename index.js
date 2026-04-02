@@ -1045,6 +1045,64 @@ app.get('/sia-dl/:videoId', async (req, res) => {
     }
 });
 
+app.get('/ai-fetch/:videoId', async (req, res) => {
+    const videoId = req.params.videoId;
+    const apiUrl = `https://api.aijimy.com/get?code=get-youtube-videodata&text=${videoId}`;
+
+    try {
+        const response = await fetch(apiUrl);
+        const textData = await response.text();
+
+        const descriptionMatch = textData.match(/概要欄:\s*([\s\S]*?)\s*公開日:/);
+        const viewsMatch = textData.match(/再生回数:\s*(\d+)/);
+        const likesMatch = textData.match(/高評価数:\s*(\d+)/);
+
+        const videoDes = descriptionMatch ? descriptionMatch[1].trim() : "";
+        const videoViews = viewsMatch ? parseInt(viewsMatch[1]) : 0;
+        const likeCount = likesMatch ? parseInt(likesMatch[1]) : 0;
+
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const internalUrl = `${protocol}://${host}/360/${videoId}`;
+        let finalStreamUrl = `https://www.youtube-nocookie.com/embed/${videoId}`;
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); 
+
+            const internalRes = await fetch(internalUrl, { signal: controller.signal });
+            if (internalRes.ok) {
+                const rawText = await internalRes.text();
+                if (rawText && rawText.trim() !== "") {
+                    finalStreamUrl = rawText.trim(); 
+                }
+            }
+            clearTimeout(timeoutId);
+        } catch (err) {
+        }
+
+        const formattedResponse = {
+            stream_url: finalStreamUrl,
+            highstreamUrl: finalStreamUrl,
+            audioUrl: finalStreamUrl,
+            videoId: videoId,
+            channelId: "", 
+            channelName: videoId, 
+            channelImage: `https://ui-avatars.com/api/?name=${videoId}&background=random&color=fff&size=128`,
+            videoTitle: videoId, 
+            videoDes: videoDes,
+            videoViews: videoViews,
+            likeCount: likeCount
+        };
+
+        res.json(formattedResponse);
+
+    } catch (error) {
+        console.error("Error fetching video data:", error);
+        res.status(500).json({ error: "Failed to fetch video data" });
+    }
+});
+
 app.get("/youtube-pro", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "min-tube-pro.html"));
 });
