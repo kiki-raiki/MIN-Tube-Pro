@@ -999,6 +999,51 @@ frame.addEventListener('click', ()=> {
 </html>`);
 });
 
+app.get('/sia-dl/:videoId', async (req, res) => {
+    const videoId = req.params.videoId;
+    const protocol = req.protocol;
+    const host = req.get('host');
+
+    try {
+        const metadataUrl = `https://siawaseok.duckdns.org/api/video2/${videoId}?depth=1`;
+        const metaResponse = await fetch(metadataUrl);
+        if (!metaResponse.ok) throw new Error('Metadata API response was not ok');
+        const data = await metaResponse.json();
+
+        const streamInfoUrl = `${protocol}://${host}/360/${videoId}`;
+        const streamResponse = await fetch(streamInfoUrl);
+        const rawStreamUrl = streamResponse.ok ? await streamResponse.text() : "";
+
+        const parseCount = (str) => {
+            if (!str) return 0;
+            return parseInt(str.replace(/[^0-9]/g, '')) || 0;
+        };
+
+        const formattedResponse = {
+            stream_url: rawStreamUrl.trim(),
+            highstreamUrl: rawStreamUrl.trim(), 
+            audioUrl: "", 
+            
+            videoId: data.id,
+            channelId: data.author?.id || "",
+            channelName: data.author?.name || "",
+            channelImage: data.author?.thumbnail || "",
+            videoTitle: data.title,
+            videoDes: data.description?.text || "",
+            
+            videoViews: parseCount(data.views || data.extended_stats?.views_original),
+            
+            likeCount: parseCount(data.likes)
+        };
+
+        res.json(formattedResponse);
+
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    }
+});
+
 app.get("/youtube-pro", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "min-tube-pro.html"));
 });
